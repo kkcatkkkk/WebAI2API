@@ -445,4 +445,10 @@ chrome:
 
 ---
 
-**感谢使用 LMArena 图像生成服务！** 🎉
+## 📋 更新日志
+
+查看完整的版本历史和更新内容，请访问 [CHANGELOG.md](CHANGELOG.md)。
+
+---
+
+**感谢 LMArena 提供图像生成服务！** 🎉
