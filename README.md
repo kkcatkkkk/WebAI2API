@@ -481,14 +481,16 @@ chrome:
 
 **问题**: 如何优化浏览器特征伪装，减少验证码弹出频率？
 
-**当前状态**:
-- ✅ **Windows 10 官方 Chrome**: 已通过 [antibot](https://bot.sannysoft.com/) 和 [CreepJS](https://abrahamjuliot.github.io/creepjs/) 测试（无红色警示）
-- ⚠️ **Linux 环境**: 未完全通过 CreepJS 测试，但基本不影响使用
+**浏览器指纹伪装状态**:
+
+- **Windows 10 (官方 Chrome)**:
+  - ✅ 已通过 [antibot](https://bot.sannysoft.com/) 和 [CreepJS](https://abrahamjuliot.github.io/creepjs/) 测试，无红色警示。
+- **Linux 环境**:
+  - ⚠️ 未完全通过 CreepJS 测试，但实际使用中影响较小，检测严格程度可能低于测试工具。
 
 **进一步优化建议**:
 
-> [!TIP]
-> 完成后，可有效缓解验证码的弹出频率。
+完成后，可有效缓解验证码的弹出频率。
 
 **1. 使用官方 Chrome（推荐）**
 
