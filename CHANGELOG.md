@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2024-11-27
+
+### Added
+- **登录模式**
+  - 添加登录模式（-login），便于手动登录
+
+### Changed
+- **浏览器启动**
+  - 采用自动程序与浏览器分离的模式，让程序连接远程调试端口，可能可以更好的减少特征
+
+---
+
 ## [1.2.0] - 2024-11-26
 
 ### Added
