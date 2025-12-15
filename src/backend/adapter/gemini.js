@@ -11,8 +11,9 @@ import {
     fillPrompt,
     normalizePageError,
     moveMouseAway,
-    waitForInput
-} from '../utils.js';
+    waitForInput,
+    gotoWithCheck
+} from '../utils/index.js';
 import { logger } from '../../utils/logger.js';
 
 // --- 配置常量 ---
@@ -35,7 +36,8 @@ async function generateImage(context, prompt, imgPaths, modelId, meta = {}) {
 
     try {
         logger.info('适配器', '开启新会话...', meta);
-        await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
+        const gotoResult = await gotoWithCheck(page, TARGET_URL);
+        if (gotoResult.error) return gotoResult;
 
         // 1. 等待输入框加载
         await waitForInput(page, inputLocator, { click: false });
@@ -165,15 +167,6 @@ async function generateImage(context, prompt, imgPaths, modelId, meta = {}) {
 }
 
 /**
- * 输入框就绪校验
- * @param {import('playwright-core').Page} page
- */
-async function waitInputValidator(page) {
-    const inputLocator = page.getByRole('textbox');
-    await waitForInput(page, inputLocator, { click: true });
-}
-
-/**
  * 适配器 manifest
  */
 export const manifest = {
@@ -195,9 +188,6 @@ export const manifest = {
         const model = this.models.find(m => m.id === modelKey);
         return model ? model.id : null;
     },
-
-    // 输入框就绪校验
-    waitInput: waitInputValidator,
 
     // 无需导航处理器
     navigationHandlers: [],

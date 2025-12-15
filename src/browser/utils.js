@@ -1,6 +1,14 @@
 /**
  * @fileoverview 浏览器自动化工具函数
- * @description 封装 Playwright 页面常用操作（等待、查找、点击、上传、拟人化行为等），供后端适配器复用。
+ * @description 封装 Playwright 页面常用操作，供后端适配器复用。
+ *
+ * 职责边界：
+ * - 浏览器原子操作（点击、输入、上传等）
+ * - 页面状态检测（isPageValid、createPageCloseWatcher）
+ * - 拟人化交互（humanType、safeClick）
+ * - 工具函数（random、sleep、getMimeType）
+ *
+ * 注意：业务逻辑应放在 backend/utils.js
  *
  * 主要函数：
  * - `random` / `sleep`：随机与延迟工具
@@ -10,7 +18,6 @@
  * - `safeClick` / `humanType`：拟人化点击与输入
  * - `pasteImages` / `uploadFilesViaChooser`：图片粘贴/上传辅助
  * - `isPageValid` / `createPageCloseWatcher`：页面有效性与关闭/崩溃监听
- * - `getCookies`：读取 Cookies（JSON 格式）
  */
 
 import path from 'path';

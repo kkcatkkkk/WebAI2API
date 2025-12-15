@@ -12,7 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 import { loadConfig } from '../utils/config.js';
-import { PoolManager } from './pool.js';
+import { PoolManager } from './pool/index.js';
 import { logger } from '../utils/logger.js';
 
 // --- 集中管理的路径常量 ---

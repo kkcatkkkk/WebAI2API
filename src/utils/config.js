@@ -175,8 +175,16 @@ export function loadConfig() {
     if (!config.server || !config.server.port) {
         throw new Error('配置文件缺少必需字段: server.port');
     }
+    // 端口类型和范围校验
+    const port = config.server.port;
+    if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(`server.port 必须是 1-65535 范围内的整数，当前值: ${port}`);
+    }
     if (!config.server.auth) {
         throw new Error('配置文件缺少必需字段: server.auth');
+    }
+    if (typeof config.server.auth !== 'string' || config.server.auth.length < 10) {
+        throw new Error('server.auth 必须是至少 10 个字符的字符串 (建议使用 npm run genkey 生成)');
     }
 
     // 设置 keepalive 配置默认值
@@ -200,6 +208,17 @@ export function loadConfig() {
     if (!['least_busy', 'round_robin', 'random'].includes(config.backend.pool.strategy)) {
         logger.warn('配置器', `无效的 pool.strategy: ${config.backend.pool.strategy}，使用默认值 least_busy`);
         config.backend.pool.strategy = 'least_busy';
+    }
+
+    // 故障转移配置默认值
+    if (!config.backend.pool.failover) {
+        config.backend.pool.failover = {};
+    }
+    if (config.backend.pool.failover.enabled === undefined) {
+        config.backend.pool.failover.enabled = true;
+    }
+    if (config.backend.pool.failover.maxRetries === undefined) {
+        config.backend.pool.failover.maxRetries = 2;
     }
 
     // 校验 instances 配置

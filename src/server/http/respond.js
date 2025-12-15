@@ -66,34 +66,34 @@ export function sendHeartbeat(res, mode, modelName) {
 }
 
 /**
- * 发送统一 API 错误响应
+ * 发送统一 API 错误响应 (OpenAI 标准格式)
  * @param {import('http').ServerResponse} res - HTTP 响应对象
  * @param {object} options - 错误选项
  * @param {string} [options.code] - 错误码（使用 ERROR_CODES 枚举）
- * @param {string} [options.error] - 自定义错误消息（如提供则覆盖 code 对应的消息）
+ * @param {string} [options.message] - 自定义错误消息（如提供则覆盖 code 对应的消息）
  * @param {number} [options.status] - 自定义 HTTP 状态码
  * @param {boolean} [options.isStreaming=false] - 是否为流式响应
- * @param {string} [options.raw] - 原始错误信息（用于调试）
  */
 export function sendApiError(res, options) {
-    const { code, error, status, isStreaming = false, raw } = options;
+    const { code, message, status, isStreaming = false } = options;
 
     // 获取错误详情
     const details = code ? getErrorDetails(code) : null;
-    const errorMessage = error || (details ? details.message : '未知错误');
+    const errorMessage = message || (details ? details.message : '未知错误');
+    const errorType = details?.type || 'server_error';
     const httpStatus = status || (details ? details.status : 500);
 
-    // 构造错误响应体
+    // 构造 OpenAI 标准错误响应体
     const payload = {
-        error: errorMessage,
-        code: code || 'INTERNAL_ERROR',
+        error: {
+            message: errorMessage,
+            type: errorType,
+            code: code || 'INTERNAL_ERROR'
+        }
     };
-    if (raw) {
-        payload.raw = raw;
-    }
 
     if (isStreaming) {
-        // 流式响应
+        // 流式响应：发送错误事件然后结束
         sendSse(res, payload);
         sendSseDone(res);
     } else {

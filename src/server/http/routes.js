@@ -81,13 +81,13 @@ export function createRouter(context) {
             // 区分错误类型
             if (err.message.includes('Worker 不存在') || err.message.includes('Worker not found')) {
                 sendApiError(res, {
-                    code: ERROR_CODES.BAD_REQUEST,
-                    error: err.message
+                    code: ERROR_CODES.INVALID_MODEL,
+                    message: err.message
                 });
             } else {
                 sendApiError(res, {
                     code: ERROR_CODES.INTERNAL_ERROR,
-                    error: err.message
+                    message: err.message
                 });
             }
         }
@@ -117,7 +117,7 @@ export function createRouter(context) {
                 logger.warn('服务器', '非流式请求被拒绝 (队列已满)', { id: requestId, queueSize: status.total });
                 sendApiError(res, {
                     code: ERROR_CODES.SERVER_BUSY,
-                    error: `服务器繁忙（队列: ${status.total}/${queueManager.maxQueueSize}）。请使用流式模式 (stream: true) 或稍后重试。`
+                    message: `服务器繁忙（队列: ${status.total}/${queueManager.maxQueueSize}）。请使用流式模式 (stream: true) 或稍后重试。`
                 });
                 return;
             }
@@ -145,7 +145,7 @@ export function createRouter(context) {
             if (!parseResult.success) {
                 sendApiError(res, {
                     code: parseResult.error.code,
-                    error: parseResult.error.error,
+                    message: parseResult.error.error,
                     isStreaming
                 });
                 return;
@@ -171,7 +171,7 @@ export function createRouter(context) {
             logger.error('服务器', '请求处理失败', { id: requestId, error: err.message });
             sendApiError(res, {
                 code: ERROR_CODES.INTERNAL_ERROR,
-                error: err.message
+                message: err.message
             });
         }
     }

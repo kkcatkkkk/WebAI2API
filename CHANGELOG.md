@@ -5,213 +5,102 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2025-12-16
+
+### ✨ Added
+- **故障转移系统**
+  - 实现了基于 Pool 的自动故障转移：当某个 Worker 执行任务失败（如 API 超时、页面崩溃、被限流）时，系统会自动寻找下一个支持该模型的 Worker 进行重试。
+  - **Merge 模式增强**：Merge Worker 内部也会在不同的适配器之间进行故障转移。
+
 ## [3.0.0] - 2025-12-14
 
-### Added
-- **支持多窗口多账号**
-  - 支持多个窗口并行进行任务，支持浏览器实例之间的数据隔离
-  - Cookies 获取接口可指定浏览器实例
+### ✨ Added
+- **多窗口多账号支持**
+  - 架构升级，支持同时管理多个浏览器实例和多个标签页。
+  - 实现了浏览器实例间的数据（Cookies/Storage）完全隔离。
+- **Cookies 管理**
+  - 新增 `/v1/cookies` 接口，支持获取指定 browser instance 的 Cookies。
 
-### Changed
-- **配置文件重构**
-  - 配置文件格式几乎重构，请重新复制模板修改
-
+### 🔄 Changed
+- **配置系统重构**
+  - 配置文件结构大幅调整，采用更清晰的 `backend.pool` 结构配置 Worker。
 
 ## [2.4.0] - 2025-12-13
 
-### Added
-- **浏览器伪装**
-  - 适配了 GEOIP 数据库，支持时区伪装，完善伪装机制
-- **初始化脚本**
-  - 支持自定义初始化步骤 npm run init -- -custom
-  - 添加下载 GeoLite2-City.mmdb 数据库的步骤
-- **增加服务器自检**
-  - 自动排查缺少的依赖和未应用的补丁并提供解决方案，降低使用门槛
-- **聚合模式监控**
-  - 在聚合模式下闲时跳转需要监控的网站，确保登录过期自动续登保持Cookie为最新
+### ✨ Added
+- **浏览器伪装增强**
+  - 集成 GEOIP 数据库，实现基于 IP 的自动时区伪装。
+- **初始化脚本 (init.js)**
+  - 支持 `npm run init -- -custom` 自定义初始化。
+  - 自动下载 GeoLite2 sum数据库。
+- **服务器自检**
+  - 启动时自动检查依赖完整性和环境补丁。
+- **Merge 模式监控**
+  - 闲时自动跳转到指定网站以维持会话活跃（保活）。
 
-### Changed
-- **重构部分**
-  - 重构服务器部分，并整理项目目录
-  - 加强注释，便于后期维护
-  - 支持获取指定域名的 Cookie
+### 🔄 Changed
+- **代码重构**
+  - 服务器代码模块化 (`src/server/`).
+  - 目录结构重新整理。
 
 ## [2.3.0] - 2025-12-12
 
-### Added
-- **支持新网站**
-  - 初步支持对 Gemini 网页版的支持
+### ✨ Added
+- **新适配器支持**
+  - 初步支持 Gemini 网页版 (`gemini.js`).
 
-### Changed
-- **接口逻辑优化**
-  - 移除了流式与非流式接口的统一开关限制，现在两种客户端可同时存在。
-  - **行为说明**：
-    -   **流式请求 (stream: true)**：支持无限排队，并通过心跳机制保持连接以等待结果。
-    -   **非流式请求**：在队列未满时正常处理；当队列满时，将立即拒绝并返回明确的拒绝原因，但仍受 `maxQueueSize` 限制。
+### 🔄 Changed
+- **流式接口优化**
+  - 移除了全局开关，改为由请求体参数 `stream: true` 动态控制。
+  - **保活机制**：流式模式下支持无限排队，并通过 SSE 心跳包防止连接超时。
+  - **拒绝策略**：非流式请求在队列满时立即拒绝，避免无限等待。
 
 ## [2.2.3] - 2025-12-12
 
-### Added
+### ✨ Added
 - **后端聚合**
-  - 可根据请求的模型id自动选择可用的适配器且遵循配置文件中的优先级
+  - 实现了根据模型 ID 自动路由到对应适配器的逻辑。
 
-### Fixed
-- **修复杂项**
-  - 修复在 MacOS 下初始化步骤缺少导致的浏览器启动失败
+### 🐛 Fixed
+- **Mac 兼容性**
+  - 修复了 MacOS 初始化步骤缺失导致的启动失败。
 
 ## [2.2.2] - 2025-12-12
 
-### Added
-- **支持Docker**
-  - 初步支持 Docker 部署 [foxhui/lmarena-imagen-automator](https://hub.docker.com/r/foxhui/lmarena-imagen-automator)
+### ✨ Added
+- **Docker 支持**
+  - 发布 Docker 镜像 [foxhui/lmarena-imagen-automator](https://hub.docker.com/r/foxhui/lmarena-imagen-automator).
 
 ## [2.2.1] - 2025-12-12
 
-### Added
-- **Cookie获取**
-  - 增加 Cookie 获取接口，可利用本项目的自动续登功能获取最新的 Cookie 给其他工具使用
+### ✨ Added
+- **Cookie 导出**
+  - 利用自动续登机制获取最新 Cookie，供外部工具使用。
 
-### Changed
-- **自动续登**
-  - 监听逻辑修改为全局监听，任何时候触发跳转都会执行自动登录（如会话过期自动跳转）
-
-### Fixed
-- **修复杂项**
-  - 修复自动登录时可能会出现的问题
-  - 修复启动VNC服务器时端口可能冲突的问题
-  - 修复遗留的浏览器启动参数导致的小问题
-  - 修复 zAI 返回错误时无反馈直到请求超时的问题
+### 🐛 Fixed
+- **自动续登修复**：改为全局监听，修复了部分场景下不触发的问题。
+- **杂项修复**：VNC 端口冲突、启动参数优化、zAI 错误反馈优化。
 
 ## [2.2.0] - 2025-12-11
 
-### Added
-- **支持新网站**
-  - 初步支持 zAI/zai.is 且支持自动续登
+### ✨ Added
+- **新适配器支持**
+  - 支持 zAI (zai.is)，含自动 Discord 登录处理。
 
-### Fixed
-- **浏览器功能**
-  - 修复 Gemini Business 自动续登监听器被多次触发的问题
-  - 修复拟人输入在 MacOS 环境下提示词无法全选删除的问题
-
-## [2.1.0] - 2025-12-09
-
-### Changed
-- **优化性能**
-  - 逐步减少冗余代码，提升性能
-  - 增加适配器代码可读性
-- **日志优化**
-  - 已可以将错误原因透传至客户端，减少故障排查成本
-
-### Fixed
-- **减少故障**
-  - 填补或删除可能会出现BUG的相关代码
-
-## [2.0.2] - 2025-12-09
-
-### Fixed
-- **修复超时逻辑**
-  - 修复在等待生成结果时超时，但是客户端任务未终止且无任何通知的问题
-
-## [2.0.1] - 2025-12-08
-
-### Added
-- **自动续登**
-  - 支持 Gemini Business 过期自动续登录
-- **内置XVFB指令**
-  - 内置了xvfb指令和x11vnc指令，只需要添加参数即可，无需记忆繁琐的指令
-
-### Changed
-- **优化分辨率**
-  - 优化浏览器窗口分辨率以确保窗口不会过大以及在服务器上消耗性能
+### 🐛 Fixed
+- **Gemini Business**：修复监听器重复触发问题。
+- **Mac 输入法**：修复拟人输入无法全选的问题。
 
 ## [2.0.0] - 2025-12-06
 
-### Added
-- **支持新网站**
- - 支持对 Nano Banana Free 网站的支持
+### 💥 Breaking Changes
+- **核心迁移**
+  - 从 Puppeteer 迁移至 **Playwright + Camoufox**。
+  - 旧版代码归档至 `puppeteer-edition` 分支。
 
-### Changed
-- **代码重构**
-  - 本项目已从 Puppeteer 迁移至 Playwright + Camoufox，以应对日益复杂的反机器人检测机制。基于 Puppeteer 的旧版本代码已归档至 `puppeteer-edition` 分支，仅作留存，**不再提供更新与维护**。
-
-## [1.3.1] - 2025-12-05
-
-### Added
-- **同步竞技场模型UUID**
-  - 新增 gemini-3-pro-image-preview-2k 模型的支持
-
-## [1.3.0] - 2025-11-28
-
-### Added
-- **Gemini Enterprise Business 支持**
-  - 新增对 Gemini Enterprise Business 的初步支持
-  - 实现请求拦截机制，强制指定 `Nano Banana Pro` 模型
-
-### Changed
-- **代码重构**
-  - 重构代码结构，提升代码复用率并增强项目的可维护性
-  - 优化日志输出系统，提高调试信息的可读性
-- **CLI 交互增强**
-  - 更新 `lib/test.js` 测试工具，支持交互式选择模型和测试方式
-
-## [1.2.1] - 2025-11-27
-
-### Added
-- **登录模式**
-  - 新增独立登录参数 (`-login`)，便于用户在非自动化模式下完成手动登录
-
-### Changed
-- **浏览器进程解耦**
-  - 调整架构为程序与浏览器分离模式：主程序现通过连接远程调试端口（Remote Debugging Port）控制浏览器，旨在降低自动化检测特征
-
-## [1.2.0] - 2025-11-26
-
-### Added
-- **浏览器指纹伪装增强**
-  - 针对 Windows 10 原生 Chrome 环境优化指纹，已在 [antibot](https://bot.sannysoft.com/) 和 [CreepJS](https://abrahamjuliot.github.io/creepjs/) 测试中无红色高危警告
-  - 集成 `ghost-cursor` 库，通过贝塞尔曲线算法生成拟人化鼠标轨迹，提升伪装效果
-  - *注：Linux 环境下的指纹伪装暂未完全覆盖，建议参考文档中的常见问题进行手动调优*
-
-### Changed
-- **底层拦截机制重构**
-  - 弃用基于 Fetch 脚本注入和 Puppeteer Request Interception 的旧方案
-  - 迁移至 CDP (Chrome DevTools Protocol) 拦截器处理模型 UUID 映射，显著降低被检测风险
-- **环境参数优化**
-  - 优化浏览器启动参数配置与窗口尺寸计算逻辑，进一步减少特征暴露
-
-## [1.1.1] - 2025-11-25
-
-### Fixed
-- **模型映射修复**
-  - 修复因 UUID 映射错误导致 `gemini-3-pro-image-preview` 模型请求返回 HTTP 500 的异常
-
-## [1.1.0] - 2025-11-24
-
-### Added
-- **多模型支持体系**
-  - 新增 `model` 参数，支持指定 Seedream, Gemini, Imagen, DALL-E 等 23+ 种图像生成模型
-  - 新增 `/v1/models` 端点，提供可用模型列表查询功能
-  - 引入 `lib/models.js` 配置文件，实现模型映射的集中管理与扩展
-  - 实现动态 payload 注入，在浏览器上下文中实时修改 `modelAId`
-- **API 兼容性更新**
-  - OpenAI 兼容接口 (`/v1/chat/completions`) 及队列接口 (`/v1/queue/join`) 均已适配 `model` 参数
-  - *注：若未指定模型，系统将默认调用网页端的缺省模型*
-
-## [1.0.1] - 2025-11-23
-
-### Fixed
-- **代理鉴权修复**
-  - 修复了带身份验证的 SOCKS5 代理无法建立连接的问题。
-
-## [1.0.0] - 2025-11-23
-
-### Added
-- **初始版本发布**
-  - 发布基于 Puppeteer 的自动化图像生成核心功能。
-  - 提供双运行模式：OpenAI API 兼容模式与 Queue 队列模式 (SSE)。
-  - 拟人化交互：内置贝塞尔曲线鼠标移动、智能键盘输入模拟及随机抖动延迟算法。
-  - **功能特性**：
-    - 支持单次最多上传 5 张图片。
-    - 支持 Bearer Token 标准认证。
-    - 完整支持 HTTP 及 SOCKS5 代理协议。
-    - 附带 CLI 测试工具及可配置化系统架构。
+### ✨ Added
+- **新适配器支持**
+  - 支持 Nano Banana Free。
+- **功能特性**
+  - 内置 XVFB/VNC 支持命令。
+  - 支持 Gemini Business 过期自动续登。

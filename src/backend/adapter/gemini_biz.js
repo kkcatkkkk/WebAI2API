@@ -18,8 +18,9 @@ import {
     lockPageAuth,
     unlockPageAuth,
     isPageAuthLocked,
-    waitForInput
-} from '../utils.js';
+    waitForInput,
+    gotoWithCheck
+} from '../utils/index.js';
 import { logger } from '../../utils/logger.js';
 
 // Gemini Biz 输入框选择器
@@ -111,7 +112,8 @@ async function generateImage(context, prompt, imgPaths, modelId, meta = {}) {
         await waitForPageAuth(page);
 
         logger.info('适配器', '开启新会话', meta);
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+        const gotoResult = await gotoWithCheck(page, targetUrl);
+        if (gotoResult.error) return gotoResult;
 
         // 如果触发了账户选择跳转，等待全局处理器完成
         await waitForPageAuth(page);
@@ -279,11 +281,6 @@ export const manifest = {
     resolveModelId(modelKey) {
         const model = this.models.find(m => m.id === modelKey);
         return model ? model.id : null;
-    },
-
-    // 输入框就绪校验
-    async waitInput(page, ctx) {
-        await waitForInput(page, INPUT_SELECTOR, { click: true });
     },
 
     // 导航处理器

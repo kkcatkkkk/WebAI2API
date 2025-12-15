@@ -114,19 +114,27 @@ export function createQueueManager(queueConfig, callbacks) {
             if (heartbeatInterval) clearInterval(heartbeatInterval);
 
             // 处理结果
-            let finalContent = '';
-
             if (result.error) {
-                // 适配器层已归一化错误，直接构造错误响应
-                finalContent = `[生成错误] ${result.error}`;
-            } else if (result.image) {
+                // 生成失败：使用标准错误格式返回
+                sendApiError(res, {
+                    code: ERROR_CODES.GENERATION_FAILED,
+                    message: result.error,
+                    status: result.retryable ? 503 : 502,
+                    isStreaming
+                });
+                return;
+            }
+
+            // 生成成功
+            let finalContent = '';
+            if (result.image) {
                 finalContent = `![generated](${result.image})`;
                 logger.info('服务器', '图片已准备就绪 (Base64)', { id });
             } else {
                 finalContent = result.text || '生成失败';
             }
 
-            // 发送响应
+            // 发送成功响应
             if (isStreaming) {
                 const chunk = buildChatCompletionChunk(finalContent, modelName);
                 sendSse(res, chunk);
@@ -143,7 +151,7 @@ export function createQueueManager(queueConfig, callbacks) {
             logger.error('服务器', '任务处理失败', { id, error: err.message });
             sendApiError(res, {
                 code: ERROR_CODES.INTERNAL_ERROR,
-                error: err.message,
+                message: err.message,
                 isStreaming
             });
         }
