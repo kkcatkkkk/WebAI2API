@@ -281,7 +281,19 @@ export const manifest = {
         { id: 'gpt-5.2', codeName: '019b1448-d548-78f4-8b98-788d72cbd057', imagePolicy: 'optional', type: 'text' },
         { id: 'glm-4.6v-flash', codeName: '019b1536-49c0-73b2-8d45-403b8571568d', imagePolicy: 'optional', type: 'text' },
         { id: 'qwen3-omni-flash', codeName: '0199c9dc-e157-7458-bd49-5942363be215', imagePolicy: 'optional', type: 'text' },
-        { id: 'gemini-3-pro-grounding', codeName: '019abdb7-6957-71c1-96a2-bfa79e8a094f', imagePolicy: 'optional', type: 'text', search: true }
+        { id: 'gemini-3-pro-grounding', codeName: '019abdb7-6957-71c1-96a2-bfa79e8a094f', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'gpt-5.1-search', codeName: '019abdb7-50a5-7c05-9308-4491d069578b', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'grok-4-fast-search', codeName: '9217ac2d-91bc-4391-aa07-b8f9e2cf11f2', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'gemini-2.5-pro-grounding', codeName: 'b222be23-bd55-4b20-930b-a30cc84d3afd', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'o3-search', codeName: 'fbe08e9a-3805-4f9f-a085-7bc38e4b51d1', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'grok-4-search', codeName: '86d767b0-2574-4e47-a256-a22bcace9f56', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'ppl-sonar-reasoning-pro-high', codeName: '24145149-86c9-4690-b7c9-79c7db216e5c', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'claude-opus-4-1-search', codeName: 'd942b564-191c-41c5-ae22-400a930a2cfe', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'gpt-5-search', codeName: 'd14d9b23-1e46-4659-b157-a3804ba7e2ef', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'claude-opus-4-search', codeName: '25bcb878-749e-49f4-ac05-de84d964bcee', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'diffbot-small-xl', codeName: '0862885e-ef53-4d0d-b9c4-4c8f68f453ce', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'grok-4-1-fast-search', codeName: '019af19c-0658-7566-9c60-112ae5bdb8db', imagePolicy: 'forbidden', type: 'text', search: true },
+        { id: 'gpt-5.2-search', codeName: '019b1448-f74a-72de-b25d-8666618f8c5a', imagePolicy: 'forbidden', type: 'text', search: true }
     ],
 
     // 模型 ID 解析
