@@ -55,6 +55,14 @@ backend:
         # 相当于在这个浏览器里打开了不同的标签页
         workers:
           - name: "default"            # 唯一标识 (用于登录模式和日志显示)
+            # 适配器类型列表:
+            #   lmarena
+            #   lmarena_text
+            #   gemini_biz
+            #   gemini_biz_text
+            #   gemini
+            #   zai_is
+            #   nanobananafree_ai
             type: lmarena              # 适配器类型
 
       # ------------------------------------------------

@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **为自动通过验证码做准备**
   - 新增测试适配器 turnstile_test ，为将来需要自动过 CloudFlare 验证码做准备
 
+### 🔄 Changed
+- **项目名称更新**
+  - 因支持的功能越来越多，决定为项目改名为 WebAI2API
+
 ## [3.0.1] - 2025-12-16
 
 ### ✨ Added

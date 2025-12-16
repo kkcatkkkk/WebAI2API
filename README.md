@@ -1,27 +1,27 @@
-# LMArenaImagenAutomator
+# WebAI2API
 ![Image](https://github.com/user-attachments/assets/296a518e-c42b-4e39-8ff6-9b4381ed4f6e)
 
 ## 📝 项目简介
 
-LMArenaImagenAutomator 是一个基于 Playwright + Camoufox 的自动化图像生成工具，支持多窗口并发与多账号管理（浏览器实例数据隔离），通过模拟人类操作与 LMArena、Gemini 等网站交互，提供兼容 OpenAI 格式的图像生成接口服务。
+**WebAI2API** 是一个基于 **Camoufox (Playwright)** 的网页版 AI 服务转通用 API 的工具。通过模拟人类操作与 LMArena、Gemini 等网站交互，提供兼容 **OpenAI 格式** 的接口服务，同时支持 **多窗口并发** 与 **多账号管理**（浏览器实例数据隔离）。
 
-当前支持的网站：
-  - [LMArena](https://lmarena.ai/)
-  - [Gemini Enterprise Business](https://business.gemini.google/)
-  - [Nano Banana Free](https://nanobananafree.ai/)
-  - [zAI](https://zai.is/)
-  - [Google Gemini](https://gemini.google.com/)
-  - 未来可能支持更多网站。。。
+### 📋 当前支持列表
+
+| 网站名称 | 文本支持 | 图片支持 | 官方网址 |
+| :--- | :---: | :---: | :--- |
+| **LMArena** | ✅ | ✅ | [lmarena.ai](https://lmarena.ai/) |
+| **Gemini Enterprise Business** | ✅ | ✅ | [business.gemini.google](https://business.gemini.google/) |
+| **Nano Banana Free** | ❌ | ✅ | [nanobananafree.ai](https://nanobananafree.ai/) |
+| **zAI** | ❌ | ✅ | [zai.is](https://zai.is/) |
+| **Google Gemini** | ❌ | ✅ | [gemini.google.com](https://gemini.google.com/) |
 
 ### ✨ 主要特性
 
-- 🤖 **拟人操作**：模拟人类打字行为和鼠标移动行为
-- 👀 **任务并行**：支持多窗口执行和多账号数据隔离
-- 🖼️ **多图支持**：最多支持同时上传 10 张参考图片
-- 📊 **队列管理**：支持任务队列，防止请求过载或超时
-- 🌐 **代理支持**：支持 HTTP 和 SOCKS5 代理配置
-- 🎭 **特征伪装**：尽量伪装成非自动程序控制的浏览器
-- 🔗 **流式保活**：复用标准接口的流式模式发送心跳包
+- 🤖 **拟人交互**：模拟人类打字与鼠标轨迹，通过特征伪装规避自动化检测。
+- 🔄 **接口兼容**：提供标准 OpenAI 格式接口，支持流式响应与心跳保活。
+- 🚀 **并发隔离**：支持多窗口并发执行，可配置独立代理，实现多账号浏览器实例级数据隔离。
+- 🖼️ **多个后端**：支持 LMArena、Gemini 等多平台，单次请求可处理多张参考图片。
+- 🛡️ **稳定防护**：内置任务队列、负载均衡、故障转移、错误重试等基础功能。
 
 ---
 
@@ -477,4 +477,4 @@ curl -X GET http://127.0.0.1:3000/v1/cookies \
 
 ---
 
-**感谢 LMArena 、Gemini 等网站提供图像生成服务！** 🎉
+**感谢 LMArena 、Gemini 等网站提供AI服务！** 🎉
