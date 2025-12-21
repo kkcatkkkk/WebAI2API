@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✨ Added
 - **新增适配器**
+  - 支持 Gemini 网页版文本生成
+
+## [3.3.0] - 2025-12-20
+
+### ✨ Added
+- **新增适配器**
   - 支持 ZenMux 
 
 ### 🔄 Changed
