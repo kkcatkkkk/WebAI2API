@@ -21,8 +21,8 @@ import { logger } from '../../utils/logger.js';
 
 // --- 配置常量 ---
 // 使用 Cloudflare Worker 作为 LMArena 入口代理
-const TARGET_URL = 'https://divine-tooth-39d4.freecatdouble.workers.dev/c/new?mode=direct';
-const TARGET_URL_SEARCH = 'https://divine-tooth-39d4.freecatdouble.workers.dev/zh/c/new?mode=direct&chat-modality=search';
+const TARGET_URL = 'https://lmarena.ai/c/new?mode=direct';
+const TARGET_URL_SEARCH = 'https://lmarena.ai/zh/c/new?mode=direct&chat-modality=search';
 
 /**
  * 执行生图任务
