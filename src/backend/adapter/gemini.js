@@ -5,6 +5,7 @@
 import {
     sleep,
     safeClick,
+    safeScroll,
     uploadFilesViaChooser
 } from '../engine/utils.js';
 import {
@@ -173,9 +174,8 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
                     meta
                 });
 
-                // 等待图片元素出现并滚动到可视范围，触发懒加载
-                await scrollToElement(page, 'model-response', { timeout: 20000 });
-
+                // 将图片滚动到可视范围，触发懒加载
+                await scrollToElement(page, 'generated-image', { timeout: 120000 });
                 imageResponse = await imageResponsePromise;
             } catch (e) {
                 const pageError = normalizePageError(e, meta);

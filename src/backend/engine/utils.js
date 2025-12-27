@@ -5,7 +5,7 @@
  * 职责边界：
  * - 浏览器原子操作（点击、输入、上传等）
  * - 页面状态检测（isPageValid、createPageCloseWatcher）
- * - 拟人化交互（humanType、safeClick）
+ * - 拟人化交互（humanType、safeClick、safeScroll）
  * - 工具函数（random、sleep、getMimeType）
  *
  * 注意：业务逻辑应放在 backend/utils.js
@@ -195,6 +195,62 @@ export async function safeClick(page, target, options = {}) {
 
         // 降级逻辑
         await el.click();
+    } catch (err) {
+        throw err;
+    }
+}
+
+/**
+ * 安全滚动 (包含拟人化移动和滚轮滚动)
+ * 支持 CSS selector、ElementHandle 和 Locator 三种输入
+ * @param {import('playwright-core').Page} page - Playwright 页面对象
+ * @param {string|import('playwright-core').ElementHandle|import('playwright-core').Locator} target - CSS 选择器、元素句柄或 Locator
+ * @param {object} [options] - 滚动选项
+ * @param {number} [options.deltaX=0] - 水平滚动距离 (正值向右)
+ * @param {number} [options.deltaY=0] - 垂直滚动距离 (正值向下)
+ * @param {string} [options.bias='random'] - 偏移偏好: 'input' 或 'random'
+ * @returns {Promise<void>}
+ */
+export async function safeScroll(page, target, options = {}) {
+    try {
+        let el;
+
+        // 判断输入类型
+        if (typeof target === 'string') {
+            // CSS selector
+            el = await page.$(target);
+            if (!el) throw new Error(`未找到: ${target}`);
+        } else if (typeof target.elementHandle === 'function') {
+            // Locator (来自 page.getByRole, page.getByText 等)
+            el = await target.elementHandle();
+            if (!el) throw new Error(`Locator 未匹配到元素`);
+        } else {
+            // ElementHandle
+            el = target;
+            if (!el || !el.asElement()) throw new Error(`Element handle invalid`);
+        }
+
+        const deltaX = options.deltaX || 0;
+        const deltaY = options.deltaY || 0;
+
+        // 使用 ghost-cursor hover 后滚动
+        if (page.cursor) {
+            const box = await el.boundingBox();
+            if (box) {
+                const { x, y } = getHumanClickPoint(box, options.bias || 'random');
+                await page.cursor.moveTo({ x, y });
+                await page.mouse.wheel(deltaX, deltaY);
+                return;
+            }
+            // 如果无法获取 box，降级到元素中心点滚动
+            await page.cursor.move(el);
+            await page.mouse.wheel(deltaX, deltaY);
+            return;
+        }
+
+        // 降级逻辑: 直接在元素上 hover 并滚动
+        await el.hover();
+        await page.mouse.wheel(deltaX, deltaY);
     } catch (err) {
         throw err;
     }

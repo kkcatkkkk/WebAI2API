@@ -8,6 +8,7 @@ import {
     uploadFilesViaChooser
 } from '../engine/utils.js';
 import {
+    fillPrompt,
     normalizePageError,
     moveMouseAway,
     waitForInput,
@@ -123,7 +124,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
         if (await modelCombobox.count() > 0) {
             await safeClick(page, modelCombobox.first(), { bias: 'button' });
             await sleep(300, 500);
-            await safeClick(page, page.getByRole('option', { name: codeName }), { bias: 'button' });
+            await safeClick(page, page.getByRole('option', { name: codeName, exact: true }), { bias: 'button' });
             await sleep(300, 500);
             logger.debug('适配器', `模型已设置为 ${codeName}`, meta);
         }
@@ -185,7 +186,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
         logger.info('适配器', '输入提示词...', meta);
         const textarea = page.locator('textarea[placeholder]');
         await waitForInput(page, textarea, { click: true });
-        await textarea.fill(prompt);
+        await fillPrompt(page, textarea, prompt, meta);
         await sleep(500, 1000);
 
         // 7. 先启动 API 监听，再点击发送
