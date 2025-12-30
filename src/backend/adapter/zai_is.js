@@ -137,38 +137,20 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
         await waitForInput(page, INPUT_SELECTOR, { click: false });
         await sleep(1500, 2500);
 
-        // 2. 并行执行：上传图片 + 填写提示词
-        const uploadTask = (imgPaths && imgPaths.length > 0) ? (async () => {
-            const expectedUploads = imgPaths.length;
-            let uploadedCount = 0;
-
+        // 2. 上传图片
+        if (imgPaths && imgPaths.length > 0) {
             await pasteImages(page, INPUT_SELECTOR, imgPaths, {
                 uploadValidator: (response) => {
                     const url = response.url();
-                    if (response.status() === 200 && url.includes('v1/files')) {
-                        uploadedCount++;
-                        logger.info('适配器', `图片上传进度: ${uploadedCount}/${expectedUploads}`, meta);
-                        if (uploadedCount >= expectedUploads) {
-                            return true;
-                        }
-                    }
-                    return false;
+                    return response.status() === 200 && url.includes('v1/files');
                 }
             });
             await sleep(500, 1000);
-        })() : Promise.resolve();
+        }
 
-        const promptTask = (async () => {
-            // 等待一小段时间，让图片上传先开始（pasteImages 会先点击输入框）
-            if (imgPaths && imgPaths.length > 0) {
-                await sleep(800, 1200);
-            }
-            await safeClick(page, INPUT_SELECTOR, { bias: 'input' });
-            await fillPrompt(page, INPUT_SELECTOR, prompt, meta);
-        })();
-
-        // 等待两个任务都完成
-        await Promise.all([uploadTask, promptTask]);
+        // 3. 填写提示词
+        await safeClick(page, INPUT_SELECTOR, { bias: 'input' });
+        await fillPrompt(page, INPUT_SELECTOR, prompt, meta);
         await sleep(500, 1000);
 
         // 4. 通过 UI 交互选择模型
