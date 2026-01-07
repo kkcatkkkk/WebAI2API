@@ -118,7 +118,10 @@ export function log(level, mod, msg, meta = {}) {
     const ts = formatTime();
     const levelMap = { debug: 'DBUG', info: 'INFO', warn: 'WARN', error: 'ERRO' };
     const levelTag = levelMap[level.toLowerCase()] || level.toUpperCase().slice(0, 4);
-    const base = `${ts} [${levelTag}] [${mod}] ${msg}`;
+
+    // 将消息中的换行符替换为 ↵ 符号，保持日志为单行
+    const sanitizedMsg = msg.replace(/\r?\n/g, ' ↵ ');
+    const base = `${ts} [${levelTag}] [${mod}] ${sanitizedMsg}`;
 
     const metaStr = Object.keys(meta).length
         ? ' | ' + Object.entries(meta).map(([k, v]) => {

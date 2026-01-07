@@ -13,11 +13,65 @@ import yaml from 'yaml';
 
 import { logger } from '../utils/logger.js';
 
-const CONFIG_PATH = path.join(process.cwd(), 'config.yaml');
+// --- 配置文件路径常量 ---
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_CONFIG_PATH = path.join(DATA_DIR, 'config.yaml');
+const ROOT_CONFIG_PATH = path.join(process.cwd(), 'config.yaml');
 const EXAMPLE_CONFIG_PATH = path.join(process.cwd(), 'config.example.yaml');
 
 // 模块级缓存：确保配置只从磁盘读取一次
 let cachedConfig = null;
+// 实际使用的配置文件路径
+let activeConfigPath = null;
+
+/**
+ * 解析配置文件路径（优先级：data/config.yaml > config.yaml > 从 config.example.yaml 复制）
+ * 自动迁移：如果只有根目录 config.yaml，会自动移动到 data/config.yaml
+ * @returns {string} 配置文件路径
+ */
+function resolveConfigPath() {
+    // 1. 优先使用 data/config.yaml
+    if (fs.existsSync(DATA_CONFIG_PATH)) {
+        return DATA_CONFIG_PATH;
+    }
+
+    // 2. 根目录有 config.yaml，自动迁移到 data/config.yaml
+    if (fs.existsSync(ROOT_CONFIG_PATH)) {
+        // 确保 data 目录存在
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        // 移动文件到 data 目录
+        fs.renameSync(ROOT_CONFIG_PATH, DATA_CONFIG_PATH);
+        logger.info('配置器', `已将 ${ROOT_CONFIG_PATH} 迁移到 ${DATA_CONFIG_PATH}`);
+        return DATA_CONFIG_PATH;
+    }
+
+    // 3. 两个都没有，从 config.example.yaml 复制到 data/config.yaml
+    if (fs.existsSync(EXAMPLE_CONFIG_PATH)) {
+        // 确保 data 目录存在
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        fs.copyFileSync(EXAMPLE_CONFIG_PATH, DATA_CONFIG_PATH);
+        logger.info('配置器', `已从 ${EXAMPLE_CONFIG_PATH} 复制配置到 ${DATA_CONFIG_PATH}`);
+        return DATA_CONFIG_PATH;
+    }
+
+    // 4. 都没有，返回 data/config.yaml 路径（后续会抛出错误）
+    return DATA_CONFIG_PATH;
+}
+
+/**
+ * 获取当前使用的配置文件路径
+ * @returns {string} 配置文件路径
+ */
+export function getConfigPath() {
+    if (!activeConfigPath) {
+        activeConfigPath = resolveConfigPath();
+    }
+    return activeConfigPath;
+}
 
 /**
  * 解析用户数据目录路径
@@ -147,17 +201,17 @@ export function loadConfig() {
     // 如果已有缓存，直接返回
     if (cachedConfig) return cachedConfig;
 
-    if (!fs.existsSync(CONFIG_PATH)) {
-        const hint = fs.existsSync(EXAMPLE_CONFIG_PATH)
-            ? `请复制 ${EXAMPLE_CONFIG_PATH} 为 ${CONFIG_PATH}`
-            : `请创建 ${CONFIG_PATH}（仓库根目录通常提供 config.example.yaml 作为模板）`;
-        throw new Error(`未找到配置文件: ${CONFIG_PATH}。${hint}`);
+    // 解析配置文件路径（带优先级和自动复制逻辑）
+    const configPath = getConfigPath();
+
+    if (!fs.existsSync(configPath)) {
+        throw new Error(`未找到配置文件: ${configPath}。请确保 data/config.yaml、config.yaml 或 config.example.yaml 存在。`);
     }
 
-    const configFile = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const configFile = fs.readFileSync(configPath, 'utf8');
     let config = yaml.parse(configFile);
     if (!config || typeof config !== 'object') {
-        throw new Error(`配置文件解析失败: ${CONFIG_PATH}`);
+        throw new Error(`配置文件解析失败: ${configPath}`);
     }
 
     // Docker 路径兼容处理
@@ -265,7 +319,7 @@ export function loadConfig() {
     }
 
     // 日志输出
-    logger.debug('配置器', '已加载 config.yaml');
+    logger.debug('配置器', `已加载配置文件: ${configPath}`);
     logger.debug('配置器', `Instances: ${config.backend.pool.instances.length}, Workers: ${config.backend.pool.workers.length}`);
     logger.debug('配置器', `调度策略: ${config.backend.pool.strategy}`);
     logger.debug('配置器', `流式心跳模式: ${config.server.keepalive.mode}`);

@@ -32,18 +32,7 @@ RUN npm install -g pnpm && pnpm install --frozen-lockfile
 COPY . .
 RUN npm run init
 
-# 4. 生成默认配置文件
-RUN cp config.example.yaml config.yaml
-
 EXPOSE 3000 5900
 
-# 5. 启动脚本：同步 data 目录中的配置文件
-CMD ["/bin/sh", "-c", "\
-    if [ -f /app/data/config.yaml ]; then \
-        cp /app/data/config.yaml /app/config.yaml; \
-    else \
-        mkdir -p /app/data; \
-        cp /app/config.yaml /app/data/config.yaml; \
-    fi; \
-    npm start -- -xvfb -vnc \
-"]
+# 4. 启动服务（配置文件会自动从 config.example.yaml 复制到 data/config.yaml）
+CMD ["npm", "start", "--", "-xvfb", "-vnc"]

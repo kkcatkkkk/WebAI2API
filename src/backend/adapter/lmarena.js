@@ -1,5 +1,5 @@
 /**
- * @fileoverview LMArena 适配器
+ * @fileoverview LMArena 图片生成适配器
  */
 
 import {
@@ -13,10 +13,10 @@ import {
     waitApiResponse,
     normalizePageError,
     normalizeHttpError,
-    downloadImage,
     moveMouseAway,
     waitForInput,
-    gotoWithCheck
+    gotoWithCheck,
+    useContextDownload
 } from '../utils/index.js';
 import { logger } from '../../utils/logger.js';
 
@@ -148,7 +148,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
             }
 
             logger.info('适配器', '已获取结果，正在下载图片...', meta);
-            const result = await downloadImage(img, context);
+            const result = await useContextDownload(img, page);
             if (result.image) {
                 logger.info('适配器', '已下载图片，任务完成', meta);
             }
@@ -179,7 +179,8 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
  */
 export const manifest = {
     id: 'lmarena',
-    displayName: 'LMArena',
+    displayName: 'LMArena (图片生成)',
+    description: '使用 LMArena 平台生成图片，支持多种图片生成模型。需要已登录的 LMArena 账户，若不登录会频繁弹出人机验证码且有速率限制。',
 
     // 配置项模式
     configSchema: [

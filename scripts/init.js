@@ -1,25 +1,97 @@
 /**
  * @fileoverview 运行环境初始化脚本（CLI）
- * @description 用于下载/准备运行所需依赖（如 Camoufox、better-sqlite3 等），并按需更新 `config.yaml`。
+ * @description 用于下载/准备运行所需依赖（如 Camoufox、better-sqlite3 等）。
  *
- * 用法：`npm run init`
+ * 用法：
+ *   npm run init                     # 自动初始化（无代理）
+ *   npm run init -- -proxy           # 自动初始化（交互式输入代理）
+ *   npm run init -- -proxy=http://127.0.0.1:7890
+ *   npm run init -- -proxy=socks5://user:pass@127.0.0.1:1080
+ *   npm run init -- -custom          # 自定义模式
  */
 
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import https from 'https';
+import http from 'http';
 import { fileURLToPath } from 'url';
-import { gotScraping } from 'got-scraping';
 import compressing from 'compressing';
-import yaml from 'yaml';
 import { logger } from '../src/utils/logger.js';
-import { getHttpProxy, getProxyConfig } from '../src/utils/proxy.js';
-import { select } from '@inquirer/prompts';
+import { select, input } from '@inquirer/prompts';
+import { anonymizeProxy, closeAnonymizedProxy } from 'proxy-chain';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.join(__dirname, '..');
 const TEMP_DIR = path.join(PROJECT_ROOT, 'data', 'temp');
-const CONFIG_PATH = path.join(PROJECT_ROOT, 'config.yaml');
+
+/**
+ * 解析命令行代理参数
+ * @returns {Promise<string|null>} 代理 URL
+ */
+async function parseProxyArg() {
+    // 查找 -proxy 或 -proxy=xxx 参数
+    const proxyArg = process.argv.find(arg => arg.startsWith('-proxy'));
+
+    if (!proxyArg) {
+        return null;
+    }
+
+    // -proxy=http://... 格式
+    if (proxyArg.includes('=')) {
+        const proxyUrl = proxyArg.split('=')[1];
+        if (proxyUrl) {
+            logger.info('初始化', `使用代理: ${proxyUrl}`);
+            return proxyUrl;
+        }
+    }
+
+    // -proxy 不带参数，交互式输入
+    logger.info('初始化', '请输入代理配置...');
+
+    const proxyType = await select({
+        message: '代理类型',
+        choices: [
+            { name: 'HTTP', value: 'http' },
+            { name: 'SOCKS5', value: 'socks5' }
+        ]
+    });
+
+    const host = await input({
+        message: '代理服务器地址',
+        default: '127.0.0.1',
+        validate: (val) => val.trim().length > 0 || '地址不能为空'
+    });
+
+    const port = await input({
+        message: '代理端口',
+        default: '7890',
+        validate: (val) => {
+            const num = parseInt(val, 10);
+            return (num > 0 && num <= 65535) || '端口必须是 1-65535 的数字';
+        }
+    });
+
+    const username = await input({
+        message: '用户名 (可选，回车跳过)',
+    });
+
+    const password = await input({
+        message: '密码 (可选，回车跳过)',
+    });
+
+    // 构建代理 URL
+    let proxyUrl = `${proxyType}://`;
+    if (username && password) {
+        proxyUrl += `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`;
+    } else if (username) {
+        proxyUrl += `${encodeURIComponent(username)}@`;
+    }
+    proxyUrl += `${host}:${port}`;
+
+    logger.info('初始化', `使用代理: ${proxyUrl}`);
+    return proxyUrl;
+}
 
 // 确保临时目录存在
 if (!fs.existsSync(TEMP_DIR)) {
@@ -74,135 +146,276 @@ function validateABI(abi) {
  * 下载文件（带进度，流式，支持重试）
  * @param {string} url - 下载地址
  * @param {string} destPath - 目标文件路径
- * @param {string|null} proxyUrl - 代理 URL
+ * @param {string|null} proxyUrl - 代理 URL（支持 http:// 和 socks5://）
  * @param {number} maxRetries - 最大重试次数
  */
 async function downloadFile(url, destPath, proxyUrl = null, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // 如果是 SOCKS5 代理，先转换为本地 HTTP 代理
+    let effectiveProxyUrl = proxyUrl;
+    let anonymizedProxy = null;
+
+    if (proxyUrl && proxyUrl.startsWith('socks5://')) {
         try {
-            if (attempt > 1) {
-                logger.info('初始化', `第 ${attempt}/${maxRetries} 次尝试下载...`);
-                // 删除之前失败的文件
-                try {
-                    if (fs.existsSync(destPath)) {
-                        fs.unlinkSync(destPath);
-                    }
-                } catch (e) { }
-            } else {
-                logger.info('初始化', `开始下载: ${url}`);
-            }
-
-            await downloadFileOnce(url, destPath, proxyUrl);
-            return destPath;
+            logger.info('初始化', `检测到 SOCKS5 代理，正在转换为 HTTP 代理...`);
+            anonymizedProxy = await anonymizeProxy(proxyUrl);
+            effectiveProxyUrl = anonymizedProxy;
+            logger.info('初始化', `SOCKS5 代理已转换: ${anonymizedProxy}`);
         } catch (error) {
-            logger.error('初始化', `下载失败 (尝试 ${attempt}/${maxRetries}): ${error.message}`);
+            logger.error('初始化', `SOCKS5 代理转换失败: ${error.message}`);
+            throw error;
+        }
+    }
 
-            if (attempt === maxRetries) {
-                throw error;
+    try {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                if (attempt > 1) {
+                    logger.info('初始化', `第 ${attempt}/${maxRetries} 次尝试下载...`);
+                    // 删除之前失败的文件
+                    try {
+                        if (fs.existsSync(destPath)) {
+                            fs.unlinkSync(destPath);
+                        }
+                    } catch (e) { }
+                } else {
+                    logger.info('初始化', `开始下载: ${url}`);
+                }
+
+                await downloadFileOnce(url, destPath, effectiveProxyUrl);
+                return destPath;
+            } catch (error) {
+                logger.error('初始化', `下载失败 (尝试 ${attempt}/${maxRetries}): ${error.message}`);
+
+                if (attempt === maxRetries) {
+                    throw error;
+                }
+
+                // 等待后重试（递增延迟）
+                const delay = attempt * 2000;
+                logger.info('初始化', `${delay / 1000} 秒后重试...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
-
-            // 等待后重试（递增延迟）
-            const delay = attempt * 2000;
-            logger.info('初始化', `${delay / 1000} 秒后重试...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    } finally {
+        // 清理 SOCKS5 代理资源
+        if (anonymizedProxy) {
+            try {
+                await closeAnonymizedProxy(anonymizedProxy, true);
+                logger.debug('初始化', '已关闭临时代理桥接');
+            } catch (e) { }
         }
     }
 }
 
 /**
  * 单次下载尝试（内部函数）
+ * 使用 Node.js 原生 http/https 模块，手动管理超时
+ * 只有在指定时间内没有任何数据传输才会触发超时
  */
 async function downloadFileOnce(url, destPath, proxyUrl = null) {
+    const IDLE_TIMEOUT = 180000; // 3 分钟无数据传输才超时
+
     return new Promise((resolve, reject) => {
-        const options = {
-            http2: false,
-            timeout: {
-                request: 900000,  // 总请求超时 15 分钟
-                read: 180000      // 两次数据接收间隔超时 3 分钟
-            },
-            retry: {
-                limit: 0
-            },
-            headerGeneratorOptions: {
-                browsers: [],
-                devices: [],
-                locales: [],
-                operatingSystems: []
-            },
+        const urlObj = new URL(url);
+        const isHttps = urlObj.protocol === 'https:';
+
+        let requestOptions = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || (isHttps ? 443 : 80),
+            path: urlObj.pathname + urlObj.search,
+            method: 'GET',
             headers: {
-                'user-agent': 'Wget/1.21.4 (linux-gnu)',
-                'accept': '*/*',
-                'accept-encoding': 'identity',
-                'connection': 'keep-alive'
+                'User-Agent': 'Wget/1.21.4 (linux-gnu)',
+                'Accept': '*/*',
+                'Accept-Encoding': 'identity',
+                'Connection': 'keep-alive'
             }
         };
 
-        if (proxyUrl) {
-            options.proxyUrl = proxyUrl;
+        // 如果有 HTTP 代理（注意：这里只支持 HTTP 代理，SOCKS 需要额外处理）
+        let httpModule = isHttps ? https : http;
+        if (proxyUrl && proxyUrl.startsWith('http')) {
+            const proxyUrlObj = new URL(proxyUrl);
+            // 使用 CONNECT 隧道代理
+            requestOptions = {
+                hostname: proxyUrlObj.hostname,
+                port: proxyUrlObj.port || 80,
+                method: 'CONNECT',
+                path: `${urlObj.hostname}:${urlObj.port || (isHttps ? 443 : 80)}`,
+                headers: {
+                    'Host': `${urlObj.hostname}:${urlObj.port || (isHttps ? 443 : 80)}`
+                }
+            };
+            if (proxyUrlObj.username) {
+                const auth = Buffer.from(`${proxyUrlObj.username}:${proxyUrlObj.password || ''}`).toString('base64');
+                requestOptions.headers['Proxy-Authorization'] = `Basic ${auth}`;
+            }
+            httpModule = http; // 代理连接始终是 HTTP
         }
 
-        const downloadStream = gotScraping.stream(url, options);
         const fileStream = fs.createWriteStream(destPath);
-
         let downloadedSize = 0;
         let totalSize = 0;
         let lastLogTime = Date.now();
+        let finished = false;
+        let idleTimer = null;
+        let req = null;
 
-        downloadStream.on('response', (response) => {
-            totalSize = parseInt(response.headers['content-length'] || '0', 10);
-            if (totalSize > 0) {
-                logger.info('初始化', `文件大小: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+        const resetIdleTimer = () => {
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                if (!finished) {
+                    const error = new Error(`下载超时: ${IDLE_TIMEOUT / 1000} 秒内没有收到任何数据`);
+                    cleanup();
+                    reject(error);
+                }
+            }, IDLE_TIMEOUT);
+        };
+
+        const cleanup = () => {
+            finished = true;
+            if (idleTimer) clearTimeout(idleTimer);
+            if (req) {
+                try { req.destroy(); } catch (e) { }
             }
-        });
-
-        downloadStream.on('data', (chunk) => {
-            downloadedSize += chunk.length;
-
-            // 每秒更新一次进度
-            const now = Date.now();
-            if (totalSize > 0 && now - lastLogTime > 1000) {
-                const percent = ((downloadedSize / totalSize) * 100).toFixed(1);
-                const downloadedMB = (downloadedSize / 1024 / 1024).toFixed(2);
-                const totalMB = (totalSize / 1024 / 1024).toFixed(2);
-                logger.info('初始化', `下载进度: ${percent}% (${downloadedMB}MB / ${totalMB}MB)`);
-                lastLogTime = now;
-            }
-        });
-
-        downloadStream.on('error', (error) => {
             fileStream.close();
-            try {
-                fs.unlinkSync(destPath);
-            } catch (e) { }
-            reject(error);
-        });
+        };
 
-        fileStream.on('error', (error) => {
-            reject(error);
-        });
+        const handleResponse = (res) => {
+            resetIdleTimer();
 
-        fileStream.on('finish', () => {
-            const finalSize = (downloadedSize / 1024 / 1024).toFixed(2);
-
-            // 验证下载完整性
-            if (totalSize > 0 && downloadedSize !== totalSize) {
-                const errorMsg = `下载不完整: 预期 ${(totalSize / 1024 / 1024).toFixed(2)} MB, 实际 ${finalSize} MB`;
-                logger.error('初始化', errorMsg);
-
-                // 清理损坏的文件
-                try {
-                    fs.unlinkSync(destPath);
-                } catch (e) { }
-
-                reject(new Error(errorMsg));
+            // 处理重定向
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                cleanup();
+                try { fs.unlinkSync(destPath); } catch (e) { }
+                logger.info('初始化', `重定向到: ${res.headers.location}`);
+                // 递归调用处理重定向
+                downloadFileOnce(res.headers.location, destPath, proxyUrl)
+                    .then(resolve)
+                    .catch(reject);
                 return;
             }
 
-            logger.info('初始化', `下载完成: ${finalSize} MB`);
-            resolve(destPath);
-        });
+            if (res.statusCode !== 200) {
+                cleanup();
+                try { fs.unlinkSync(destPath); } catch (e) { }
+                reject(new Error(`HTTP 错误: ${res.statusCode}`));
+                return;
+            }
 
-        downloadStream.pipe(fileStream);
+            totalSize = parseInt(res.headers['content-length'] || '0', 10);
+            if (totalSize > 0) {
+                logger.info('初始化', `文件大小: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+            }
+
+            res.on('data', (chunk) => {
+                resetIdleTimer();
+                downloadedSize += chunk.length;
+
+                const now = Date.now();
+                if (totalSize > 0 && now - lastLogTime > 100) {  // 100ms 更新一次，更流畅
+                    const percent = ((downloadedSize / totalSize) * 100).toFixed(1);
+                    const downloadedMB = (downloadedSize / 1024 / 1024).toFixed(2);
+                    const totalMB = (totalSize / 1024 / 1024).toFixed(2);
+                    // 使用 \r 回到行首，实现单行刷新
+                    process.stdout.write(`\r下载进度: ${percent}% (${downloadedMB}MB / ${totalMB}MB)    `);
+                    lastLogTime = now;
+                }
+            });
+
+            res.on('error', (error) => {
+                if (finished) return;
+                cleanup();
+                try { fs.unlinkSync(destPath); } catch (e) { }
+                reject(error);
+            });
+
+            res.pipe(fileStream);
+
+            fileStream.on('error', (error) => {
+                if (finished) return;
+                cleanup();
+                reject(error);
+            });
+
+            fileStream.on('finish', () => {
+                if (finished) return;
+                finished = true;
+                if (idleTimer) clearTimeout(idleTimer);
+
+                const finalSize = (downloadedSize / 1024 / 1024).toFixed(2);
+
+                if (totalSize > 0 && downloadedSize !== totalSize) {
+                    process.stdout.write('\n');  // 换行，避免与进度条混在一起
+                    const errorMsg = `下载不完整: 预期 ${(totalSize / 1024 / 1024).toFixed(2)} MB, 实际 ${finalSize} MB`;
+                    logger.error('初始化', errorMsg);
+                    try { fs.unlinkSync(destPath); } catch (e) { }
+                    reject(new Error(errorMsg));
+                    return;
+                }
+
+                process.stdout.write('\n');  // 换行，结束进度条
+                logger.info('初始化', `下载完成: ${finalSize} MB`);
+                resolve(destPath);
+            });
+        };
+
+        resetIdleTimer();
+
+        // 如果使用代理，先建立隧道
+        if (proxyUrl && proxyUrl.startsWith('http')) {
+            req = http.request(requestOptions);
+            req.on('connect', (res, socket) => {
+                if (res.statusCode !== 200) {
+                    cleanup();
+                    reject(new Error(`代理连接失败: ${res.statusCode}`));
+                    return;
+                }
+
+                // 通过隧道发起真正的 HTTPS 请求
+                const tunnelOptions = {
+                    hostname: urlObj.hostname,
+                    port: urlObj.port || (isHttps ? 443 : 80),
+                    path: urlObj.pathname + urlObj.search,
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': 'Wget/1.21.4 (linux-gnu)',
+                        'Accept': '*/*',
+                        'Accept-Encoding': 'identity',
+                        'Connection': 'keep-alive',
+                        'Host': urlObj.host
+                    },
+                    socket: socket,
+                    agent: false
+                };
+
+                const tunnelReq = (isHttps ? https : http).request(tunnelOptions, handleResponse);
+                tunnelReq.on('error', (error) => {
+                    if (finished) return;
+                    cleanup();
+                    try { fs.unlinkSync(destPath); } catch (e) { }
+                    reject(error);
+                });
+                tunnelReq.end();
+            });
+            req.on('error', (error) => {
+                if (finished) return;
+                cleanup();
+                try { fs.unlinkSync(destPath); } catch (e) { }
+                reject(error);
+            });
+            req.end();
+        } else {
+            // 直连模式
+            req = httpModule.request(requestOptions, handleResponse);
+            req.on('error', (error) => {
+                if (finished) return;
+                cleanup();
+                try { fs.unlinkSync(destPath); } catch (e) { }
+                reject(error);
+            });
+            req.end();
+        }
     });
 }
 
@@ -339,9 +552,6 @@ async function installCamoufox(platform, arch, proxyUrl) {
 
     logger.info('初始化', `Camoufox 安装成功: ${camoufoxDir}`);
 
-    // 更新 config.yaml
-    updateConfigPath(platform, camoufoxDir);
-
     // 创建 version.json
     const versionJsonPath = path.join(camoufoxDir, 'version.json');
     const versionData = {
@@ -355,51 +565,6 @@ async function installCamoufox(platform, arch, proxyUrl) {
     fs.unlinkSync(downloadPath);
 }
 
-/**
- * 更新 config.yaml 中的 browser.path
- */
-function updateConfigPath(platform, camoufoxDir) {
-    try {
-        const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
-
-        // 解析为文档对象 (CST)
-        const doc = yaml.parseDocument(configContent);
-
-        // 构造绝对路径
-        let browserPath;
-        if (platform === 'win32') {
-            browserPath = path.join(camoufoxDir, 'camoufox.exe');
-        } else if (platform === 'darwin') {
-            browserPath = path.join(camoufoxDir, 'Camoufox.app', 'Contents', 'MacOS', 'camoufox');
-        } else {
-            browserPath = path.join(camoufoxDir, 'camoufox');
-        }
-
-        // 规范化路径分隔符
-        browserPath = browserPath.replace(/\\/g, '/');
-
-        // 安全地更新路径，如果节点不存在则创建
-        if (!doc.has('browser')) {
-            doc.set('browser', { path: browserPath });
-        } else {
-            const browserNode = doc.get('browser');
-            if (browserNode && typeof browserNode.set === 'function') {
-                browserNode.set('path', browserPath);
-            } else {
-                // 如果 browser 不是对象（理论上不应该发生），强制覆盖
-                doc.set('browser', { path: browserPath });
-            }
-        }
-
-        // 转回字符串，保留注释
-        const updatedYaml = doc.toString();
-        fs.writeFileSync(CONFIG_PATH, updatedYaml, 'utf8');
-
-        logger.info('初始化', `已更新配置文件 browser.path: ${browserPath}`);
-    } catch (e) {
-        logger.error('初始化', '更新配置文件失败', { error: e.message });
-    }
-}
 
 /**
  * 主流程
@@ -409,6 +574,14 @@ function updateConfigPath(platform, camoufoxDir) {
         logger.info('初始化', '========================================');
         logger.info('初始化', '依赖初始化脚本启动');
         logger.info('初始化', '========================================');
+
+        // 代理使用提示
+        if (!process.argv.some(arg => arg.startsWith('-proxy'))) {
+            logger.warn('初始化', '该脚本需连接 GitHub 下载资源。若网络受限，请使用代理：');
+            logger.warn('初始化', ' - 用法: npm run init -- -proxy 可交互式填写代理信息');
+            logger.warn('初始化', ' - 同时支持直接传入参数或者使用带鉴权的代理 (支持HTTP和SOCKS5)');
+            logger.warn('初始化', ' - 示例: npm run init -- -proxy=http://username:passwd@127.0.0.1:7890');
+        }
 
         // 显示系统信息
         const { platform, arch, nodeVersion, abi } = getPlatformInfo();
@@ -438,18 +611,8 @@ function updateConfigPath(platform, camoufoxDir) {
 
         logger.info('初始化', 'ABI 版本检查通过');
 
-        // 读取并转换代理配置
-        let proxyUrl = null;
-        try {
-            const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
-            const config = yaml.parse(configContent);
-            const proxyConfig = getProxyConfig(config);
-            if (proxyConfig) {
-                proxyUrl = await getHttpProxy(proxyConfig);
-            }
-        } catch (e) {
-            logger.warn('初始化', '无法读取配置文件或转换代理，不使用代理');
-        }
+        // 解析代理参数
+        const proxyUrl = await parseProxyArg();
 
         // 检查是否为自定义模式
         const isCustomMode = process.argv.includes('-custom');

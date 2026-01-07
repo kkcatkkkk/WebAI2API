@@ -59,13 +59,13 @@ const handleLogin = async () => {
                     WebAI2API 管理面板
                 </div>
                 <div style="color: #8c8c8c; margin-top: 8px;">
-                    请输入访问 Token 以继续
+                    请输入访问 API Token 以继续
                 </div>
             </div>
 
             <a-form layout="vertical">
-                <a-form-item label="Access Token">
-                    <a-input-password v-model:value="token" placeholder="请输入 Token" size="large"
+                <a-form-item label="API Token">
+                    <a-input-password v-model:value="token" placeholder="请输入 API Token" size="large"
                         @pressEnter="handleLogin">
                         <template #prefix>
                             <LockOutlined style="color: rgba(0,0,0,.25)" />

@@ -1,10 +1,11 @@
 /**
- * @fileoverview Gemini（消费者版）适配器
+ * @fileoverview Google Gemini 图片、视频生成适配器
  */
 
 import {
     sleep,
     safeClick,
+    safeScroll,
     uploadFilesViaChooser
 } from '../engine/utils.js';
 import {
@@ -71,16 +72,33 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
         await fillPrompt(page, inputLocator, prompt, meta);
         await sleep(500, 1000);
 
-        // 4. 点击 Tools 按钮启用图片生成
+        // 4. 点击 Tools 按钮启用图片/视频生成
         logger.debug('适配器', '点击 Tools 按钮...', meta);
         const toolsBtn = page.getByRole('button', { name: 'Tools' });
         await safeClick(page, toolsBtn, { bias: 'button' });
         await sleep(500, 1000);
 
-        // 5. 点击 Create images 按钮
-        logger.debug('适配器', '点击 Create images 按钮...', meta);
-        const createImagesBtn = page.getByRole('button', { name: 'Create images' });
-        await safeClick(page, createImagesBtn, { bias: 'button' });
+        // 检测是否是视频模型
+        const isVideoModel = modelId && modelId.startsWith('veo-');
+
+        // 5. 点击 Create images / Create videos 按钮
+        if (isVideoModel) {
+            logger.debug('适配器', '点击 Create videos 按钮...', meta);
+            const createVideosBtn = page.getByRole('button', { name: /^Create videos/ });
+
+            // 检查按钮是否存在（有些账号可能没有视频生成功能）
+            const btnCount = await createVideosBtn.count();
+            if (btnCount === 0) {
+                logger.error('适配器', '未找到 Create videos 按钮，该账号可能不支持视频生成', meta);
+                return { error: '该账号不支持视频生成功能 (未找到 Create videos 按钮)' };
+            }
+
+            await safeClick(page, createVideosBtn, { bias: 'button' });
+        } else {
+            logger.debug('适配器', '点击 Create images 按钮...', meta);
+            const createImagesBtn = page.getByRole('button', { name: 'Create images' });
+            await safeClick(page, createImagesBtn, { bias: 'button' });
+        }
         await sleep(500, 1000);
 
         // 6. 点击发送
@@ -111,32 +129,69 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
             return { error: `API 返回错误: ${httpError.error}` };
         }
 
-        logger.info('适配器', '生成请求成功，等待图片...', meta);
+        // 8. 等待图片/视频响应
+        if (isVideoModel) {
+            // 视频模式：等待视频下载链接
+            logger.info('适配器', '生成请求成功，等待视频...', meta);
 
-        // 8. 等待图片响应
-        let imageResponse;
-        try {
-            imageResponse = await waitApiResponse(page, {
-                urlMatch: 'googleusercontent.com/rd-gg-dl',
-                urlContains: '=s1024-rj',
-                method: 'GET',
-                timeout: 60000,
-                meta
-            });
-        } catch (e) {
-            const pageError = normalizePageError(e, meta);
-            if (pageError) return pageError;
-            throw e;
+            let videoResponse;
+            try {
+                videoResponse = await waitApiResponse(page, {
+                    urlMatch: 'contribution.usercontent.google.com/download',
+                    urlContains: 'filename=video.mp4',
+                    method: 'GET',
+                    timeout: 180000,  // 视频生成可能更慢
+                    meta
+                });
+            } catch (e) {
+                const pageError = normalizePageError(e, meta);
+                if (pageError) return pageError;
+                throw e;
+            }
+
+            // 获取视频数据
+            const buffer = await videoResponse.body();
+            const base64 = buffer.toString('base64');
+            const contentType = videoResponse.headers()['content-type'] || 'video/mp4';
+            const videoData = `data:${contentType};base64,${base64}`;
+
+            logger.info('适配器', '已获取视频，任务完成', meta);
+            return { image: videoData };
+
+        } else {
+            // 图片模式
+            logger.info('适配器', '生成请求成功，等待图片...', meta);
+
+            let imageResponse;
+            try {
+                // 先启动监听器，再滚动触发懒加载，避免错过请求
+                const imageResponsePromise = waitApiResponse(page, {
+                    urlMatch: 'googleusercontent.com/rd-gg-dl',
+                    urlContains: '=s1024-rj',
+                    method: 'GET',
+                    timeout: 60000,
+                    meta
+                });
+
+                // 等待图片元素出现，然后在chat-history上滚动触发懒加载
+                await page.locator('generated-image').waitFor({ state: 'attached', timeout: 120000 });
+                await safeScroll(page, '#chat-history', { deltaY: 700 });
+                imageResponse = await imageResponsePromise;
+            } catch (e) {
+                const pageError = normalizePageError(e, meta);
+                if (pageError) return pageError;
+                throw e;
+            }
+
+            // 获取图片数据
+            const buffer = await imageResponse.body();
+            const base64 = buffer.toString('base64');
+            const contentType = imageResponse.headers()['content-type'] || 'image/jpeg';
+            const imageData = `data:${contentType};base64,${base64}`;
+
+            logger.info('适配器', '已获取图片，任务完成', meta);
+            return { image: imageData };
         }
-
-        // 获取图片数据
-        const buffer = await imageResponse.body();
-        const base64 = buffer.toString('base64');
-        const contentType = imageResponse.headers()['content-type'] || 'image/jpeg';
-        const imageData = `data:${contentType};base64,${base64}`;
-
-        logger.info('适配器', '已获取图片，任务完成', meta);
-        return { image: imageData };
 
     } catch (err) {
         // 顶层错误处理
@@ -156,7 +211,8 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
  */
 export const manifest = {
     id: 'gemini',
-    displayName: 'Gemini (Consumer)',
+    displayName: 'Google Gemini (图片、视频生成)',
+    description: '使用 Google Gemini 官网生成图片和视频，支持参考图片上传。需要已登录的 Google 账户，免费账户图片生成有速率限制，视频生成必须为会员账户才可使用。',
 
     // 入口 URL
     getTargetUrl(config, workerConfig) {
@@ -165,7 +221,8 @@ export const manifest = {
 
     // 模型列表
     models: [
-        { id: 'gemini-3-pro-image-preview', imagePolicy: 'optional' }
+        { id: 'gemini-3-pro-image-preview', imagePolicy: 'optional' },
+        { id: 'veo-3.1-generate-preview', imagePolicy: 'optional' }
     ],
 
     // 无需导航处理器

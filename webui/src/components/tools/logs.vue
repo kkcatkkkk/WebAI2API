@@ -69,9 +69,9 @@ const parseLogs = (lines) => {
     });
 };
 
-// 过滤后的日志
+// 过滤后的日志（最新的在最上面）
 const filteredLogs = computed(() => {
-    return logs.value.filter(log => {
+    const filtered = logs.value.filter(log => {
         // 级别过滤
         if (levelFilter.value !== 'all' && log.level !== levelFilter.value) {
             return false;
@@ -83,6 +83,8 @@ const filteredLogs = computed(() => {
         }
         return true;
     });
+    // 反转数组，最新的日志显示在最上面
+    return filtered.reverse();
 });
 
 // 清除日志

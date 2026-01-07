@@ -22,18 +22,35 @@ onMounted(async () => {
     ]);
 });
 
-// 计算属性：适配器选项
+// 计算属性：适配器选项（包含 merge）
 const adapterOptions = computed(() => {
     const options = settingsStore.adaptersMeta.map(a => ({
-        label: a.name,
+        label: a.displayName || a.id,
         value: a.id
     }));
-    // 手动添加 Merge 选项（如果没有在元数据中返回）
+    // 将 Merge 选项放在第一个位置
     if (!options.find(o => o.value === 'merge')) {
-        options.push({ label: 'Merge（聚合模式）', value: 'merge' });
+        options.unshift({ label: 'Merge（聚合模式）', value: 'merge' });
     }
     return options;
 });
+
+// 计算属性：可聚合的适配器选项（不包含 merge，避免套娃）
+const mergeableAdapterOptions = computed(() => {
+    return settingsStore.adaptersMeta
+        .filter(a => a.id !== 'merge')
+        .map(a => ({
+            label: a.displayName || a.id,
+            value: a.id
+        }));
+});
+
+// 辅助函数：根据适配器 ID 获取 displayName
+const getAdapterDisplayName = (id) => {
+    if (id === 'merge') return 'Merge（聚合模式）';
+    const adapter = settingsStore.adaptersMeta.find(a => a.id === id);
+    return adapter?.displayName || id;
+};
 
 // 实例列表表格列定义
 const columns = [
@@ -419,11 +436,11 @@ const handleRemoveWorker = (index) => {
                                 <div>
                                     <div style="font-weight: 600;">{{ item.name }}</div>
                                     <div style="font-size: 12px; color: #8c8c8c;">
-                                        类型: {{ item.type }}
+                                        类型: {{ getAdapterDisplayName(item.type) }}
                                         <span v-if="item.type === 'merge'">
-                                            | 聚合: {{ item.mergeTypes?.join(', ') || '无' }}
+                                            | 聚合: {{ item.mergeTypes?.map(getAdapterDisplayName).join(', ') || '无' }}
                                             <span v-if="item.mergeMonitor">
-                                                | 监控: {{ item.mergeMonitor }}
+                                                | 监控: {{ getAdapterDisplayName(item.mergeMonitor) }}
                                             </span>
                                         </span>
                                     </div>
@@ -467,7 +484,7 @@ const handleRemoveWorker = (index) => {
                         选择要聚合的后端适配器（可多选）
                     </div>
                     <a-select v-model:value="workerForm.mergeTypes" mode="multiple" style="width: 100%"
-                        placeholder="选择要聚合的适配器" :options="adapterOptions">
+                        placeholder="选择要聚合的适配器" :options="mergeableAdapterOptions">
                     </a-select>
                 </div>
 
@@ -480,7 +497,7 @@ const handleRemoveWorker = (index) => {
                         allow-clear>
                         <a-select-option value="">无</a-select-option>
                         <a-select-option v-for="type in workerForm.mergeTypes" :key="type" :value="type">
-                            {{ type }}
+                            {{ getAdapterDisplayName(type) }}
                         </a-select-option>
                     </a-select>
                 </div>

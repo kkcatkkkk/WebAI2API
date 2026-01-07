@@ -4,7 +4,8 @@ logLevel: info
 server:
   # 监听端口
   port: 3000
-  # 鉴权 Token (Bearer Token) (可使用 npm run genkey 生成)
+  # 鉴权 API Token (可使用 npm run genkey 生成)
+  # 该配置会对 API 接口和 WebUI 生效
   auth: sk-change-me-to-your-secure-key
   # 流式请求心跳设置 (自动对 stream: true 的请求发送心跳防止超时)
   keepalive:
@@ -56,15 +57,16 @@ backend:
         workers:
           - name: "default"            # 唯一标识 (用于登录模式和日志显示)
             # 适配器类型列表:
-            #   lmarena
-            #   lmarena_text
-            #   gemini_biz
-            #   gemini_biz_text
-            #   gemini
-            #   gemini_text
-            #   zai_is
-            #   nanobananafree_ai
-            #   zenmux_ai_text
+            #   lmarena                (LMArena 图片生成)
+            #   lmarena_text           (LMArena 文本生成)
+            #   gemini_biz             (Gemini Business 图片、视频生成)
+            #   gemini_biz_text        (Gemini Business 文本生成)
+            #   gemini                 (Google Gemini 图片、视频生成)
+            #   gemini_text            (Google Gemini 文本生成)
+            #   zai_is                 (zAI 图片生成)
+            #   nanobananafree_ai      (NanoBananaFree 图片生成)
+            #   zenmux_ai_text         (ZenMux 文本生成)
+            #   chatgpt                (ChatGPT 图片生成)
             type: lmarena              # 适配器类型
 
       # ------------------------------------------------
@@ -120,6 +122,13 @@ backend:
     lmarena:
       # 开启后直接返回图片 URL (但其他不支持该选项的适配器仍然会返回 Base64)
       returnUrl: false
+      # 该适配器的模型黑白名单 (每个适配器都可以使用该功能，配置上级为适配器ID，推荐使用 WebUI 修改)
+      # modelFilter:
+      #  mode: whitelist                        # 白名单whitelist 黑名单blacklist
+      #  list:                                  # 仅启用和仅禁用的模型列表
+      #    - gemini-3-pro-image-preview
+      #    - gemini-3-pro-image-preview-2k
+      #    - gemini-2.5-flash-image-preview
       
 
 queue:
@@ -132,7 +141,8 @@ queue:
   imageLimit: 5
 
 browser:
-  # 浏览器可执行文件路径 (留空则使用 Camoufox 默认下载路径)
+  # 浏览器可执行文件路径 (留空则使用默认的)
+  # 非必要不建议修改，否则你要处理很多额外依赖
   # Windows系统示例 "C:\\camoufox\\camoufox.exe"
   # Linux系统示例 "/opt/camoufox/camoufox"
   path: ""

@@ -7,18 +7,18 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'yaml';
 import { logger } from '../utils/logger.js';
-
-const CONFIG_PATH = path.join(process.cwd(), 'config.yaml');
+import { getConfigPath } from './index.js';
 
 /**
  * 读取原始配置（不带缓存，直接从磁盘读取）
  * @returns {object} 原始配置对象
  */
 function readRawConfig() {
-    if (!fs.existsSync(CONFIG_PATH)) {
+    const configPath = getConfigPath();
+    if (!fs.existsSync(configPath)) {
         throw new Error('配置文件不存在');
     }
-    const content = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const content = fs.readFileSync(configPath, 'utf8');
     return yaml.parse(content);
 }
 
@@ -27,13 +27,14 @@ function readRawConfig() {
  * @param {object} config - 完整配置对象
  */
 function writeConfig(config) {
+    const configPath = getConfigPath();
     // 使用 yaml 库的默认序列化（会丢失注释，但结构正确）
     const content = yaml.stringify(config, {
         indent: 2,
         lineWidth: 0 // 不自动换行
     });
-    fs.writeFileSync(CONFIG_PATH, content, 'utf8');
-    logger.info('管理器', '配置已保存到 config.yaml');
+    fs.writeFileSync(configPath, content, 'utf8');
+    logger.info('管理器', `配置已保存到 ${configPath}`);
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * @fileoverview NanoBananaFree AI 适配器
+ * @fileoverview NanoBananaFree 图片生成适配器
  */
 
 import {
@@ -135,7 +135,8 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
  */
 export const manifest = {
     id: 'nanobananafree_ai',
-    displayName: 'NanoBananaFree AI',
+    displayName: 'NanoBananaFree (图片生成)',
+    description: '使用 NanoBananaFree 平台生成图片，仅支持上传单张图片。需要已登录的 Google 账户。',
 
     // 入口 URL
     getTargetUrl(config, workerConfig) {

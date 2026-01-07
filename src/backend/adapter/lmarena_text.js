@@ -1,5 +1,5 @@
 /**
- * @fileoverview LMArena 适配器
+ * @fileoverview LMArena 文本生成适配器
  */
 
 import {
@@ -171,7 +171,8 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
  */
 export const manifest = {
     id: 'lmarena_text',
-    displayName: 'LMArena Text',
+    displayName: 'LMArena (文本生成)',
+    description: '使用 LMArena 平台生成文本，支持多种大语言模型和搜索模式。需要已登录的 LMArena 账户，若不登录会频繁弹出人机验证码且有速率限制。',
 
     // 入口 URL
     getTargetUrl(config, workerConfig) {

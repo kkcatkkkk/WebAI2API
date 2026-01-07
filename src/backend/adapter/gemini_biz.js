@@ -1,5 +1,5 @@
 /**
- * @fileoverview Gemini Business 适配器
+ * @fileoverview Gemini Business 文本生成适配器
  */
 
 import {
@@ -19,7 +19,8 @@ import {
     unlockPageAuth,
     isPageAuthLocked,
     waitForInput,
-    gotoWithCheck
+    gotoWithCheck,
+    scrollToElement
 } from '../utils/index.js';
 import { logger } from '../../utils/logger.js';
 
@@ -171,9 +172,16 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
                     logger.debug('适配器', '已拦截请求，正在修改...', meta);
                     if (!postData.streamAssistRequest) postData.streamAssistRequest = {};
                     if (!postData.streamAssistRequest.assistGenerationConfig) postData.streamAssistRequest.assistGenerationConfig = {};
-                    postData.streamAssistRequest.toolsSpec = { imageGenerationSpec: {} };
 
-                    logger.info('适配器', '已拦截请求，强制使用 Nano Banana Pro', meta);
+                    // 根据模型 ID 选择 toolsSpec
+                    if (modelId && modelId.startsWith('veo-')) {
+                        postData.streamAssistRequest.toolsSpec = { videoGenerationSpec: {} };
+                        logger.info('适配器', '已拦截请求，使用视频生成规格', meta);
+                    } else {
+                        postData.streamAssistRequest.toolsSpec = { imageGenerationSpec: {} };
+                        logger.info('适配器', '已拦截请求，使用图片生成规格', meta);
+                    }
+
                     await route.continue({ postData: JSON.stringify(postData) });
                     return;
                 }
@@ -183,7 +191,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
             await route.continue();
         });
 
-        // 5. 提交 (submit - 使用公共函数)
+        // 5. 提交
         logger.debug('适配器', '点击发送...', meta);
         await submit(page, {
             btnSelector: 'md-icon-button.send-button.submit, button[aria-label="提交"], button[aria-label="Send"], .send-button',
@@ -200,6 +208,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
                 urlMatch: 'global/widgetStreamAssist',
                 method: 'POST',
                 timeout: 120000,
+                errorText: ['modelArmorViolation'],
                 meta
             });
         } catch (e) {
@@ -220,12 +229,19 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
 
         let imageResponse;
         try {
-            imageResponse = await waitApiResponse(page, {
+            // 先启动监听器，再滚动触发懒加载，避免错过请求
+            const imageResponsePromise = waitApiResponse(page, {
                 urlMatch: 'download/v1alpha/projects',
                 method: 'GET',
                 timeout: 120000,
+                errorText: ['is unable to reply as the prompt'],
                 meta
             });
+
+            // 等待图片元素出现并滚动到可视范围，触发懒加载
+            await scrollToElement(page, 'ucs-markdown-image', { timeout: 20000 });
+
+            imageResponse = await imageResponsePromise;
         } catch (e) {
             const pageError = normalizePageError(e, meta);
             if (pageError) {
@@ -239,8 +255,12 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
 
 
         const base64 = await imageResponse.text();
-        logger.info('适配器', '已下载图片，任务完成', meta);
-        const dataUri = `data:image/png;base64,${base64}`;
+
+        // 从响应头获取内容类型
+        const contentType = imageResponse.headers()['x-goog-safety-content-type'] || 'image/png';
+        logger.info('适配器', `已下载内容，类型: ${contentType}`, meta);
+
+        const dataUri = `data:${contentType};base64,${base64}`;
         return { image: dataUri };
 
 
@@ -264,7 +284,8 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
  */
 export const manifest = {
     id: 'gemini_biz',
-    displayName: 'Gemini Business',
+    displayName: 'Gemini Business (图片、视频生成)',
+    description: '使用 Gemini Business 企业版生成图片和视频。需要提供入口 URL 并已登录企业账户 (每个谷歌账户首次可以在官网点击免费试用获取30天使用资格)。',
 
     // 配置表单定义
     configSchema: [
@@ -284,7 +305,8 @@ export const manifest = {
 
     // 模型列表
     models: [
-        { id: 'gemini-3-pro-image-preview', imagePolicy: 'optional' }
+        { id: 'gemini-3-pro-image-preview', imagePolicy: 'optional' },
+        { id: 'veo-3.1-generate-preview', imagePolicy: 'optional' },
     ],
 
     // 导航处理器

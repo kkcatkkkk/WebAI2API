@@ -5,11 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.3.0] - 2025-12-20
+## [3.4.3] - 2025-12-26
+
+### ✨ Added
+- **适配器描述**
+  - 为每个适配器添加描述，可以在 WebUI 中的适配器设置页面点击查看每个适配器的描述和使用方法。
+- **适配器模型管理**
+  - 为每个适配器添加模型列表管理，支持黑名单和白名单，可用于禁用网站出现问题的模型
+- **调试适配器**
+  - 多种检测网站聚合，IP 纯净度查询等，并初步测试自动过盾
+
+## [3.4.3] - 2025-12-26
+
+### 🐛 Fixed
+- **Gemini**：修复因懒加载导致的等待图片超时问题
+
+## [3.4.2] - 2025-12-25
+
+### 🔄 Changed
+- **浏览器指纹**
+  - 增加 WebGL 和 Canvas 噪点的持久化，防止频繁变化
+  - 清洗插件列表，防止出现 FireFox 中有 Chrome 内置的 PDF 阅读器插件
+  - 清洗 UA 标识，防止出现未来浏览器版本，导致某些网站报错403 (如：aistudio)
+- **关闭动画**
+  - 通过 about:config 中的设置禁用背景高斯模糊 CSS 和减少动画，节省资源占用
+
+## [3.4.1] - 2025-12-24
+
+### ✨ Added
+- **新增适配器**
+  - 支持 Google Flow 图片生成适配器
+
+### 🐛 Fixed
+- **Gemini Business**：修复因懒加载导致的等待图片超时问题
+
+## [3.4.0] - 2025-12-23
+
+### ✨ Added
+- **新增适配器**
+  - 支持 ChatGPT 文本生成适配器
+  - 支持 zAI 文本生成适配器
+  - 支持 DeepSeek 文本生成适配器
+  - 支持 Sora 视频生成适配器
+
+### 🔄 Changed
+- **适配器实现更改**
+  - zAI 图片生成适配器不再使用拦截请求修改响应体的方式，改为UI选择模型列表，并且Nano Banana Pro 支持选择1K、2K、4K
+
+## [3.3.2] - 2025-12-22
+
+### 🔄 Changed
+- **配置文件**
+  - 自动复制初始化配置文件，并放进`data/config.yaml`，Docker友好化
+  - 优化 Dockerfile
+  - 初始化脚本不再依赖配置文件，支持交互式和参数传入式配置代理
+  - 优化 WebUI 文案和日志排列
+
+### ❌ Removed
+- **删除测试脚本**
+  - 现在有 WebUI 测试了，已经无需 test 脚本了
+
+## [3.3.1] - 2025-12-21
 
 ### ✨ Added
 - **新增适配器**
   - 支持 Gemini 网页版文本生成
+  - 支持 ChatGPT 图片生成
+- **支持视频生成**
+  - 支持在 Gemini 网页版和 Gemini Enterprise Business 图片生成适配器中生成视频
+
+### 🔄 Changed
+- **优化图片下载方式**
+  - 让文件下载步骤直接继承浏览器上下文减少特征
 
 ## [3.3.0] - 2025-12-20
 

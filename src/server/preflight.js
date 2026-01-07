@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { logger } from './logger.js';
+import { logger } from '../utils/logger.js';
 
 const PROJECT_ROOT = process.cwd();
 

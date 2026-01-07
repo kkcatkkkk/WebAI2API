@@ -1,5 +1,5 @@
 /**
- * @fileoverview zAI 图片生成适配器
+ * @fileoverview zAI 文本生成适配器
  */
 
 import {
@@ -14,7 +14,6 @@ import {
     normalizeHttpError,
     waitApiResponse,
     moveMouseAway,
-    useContextDownload,
     waitForPageAuth,
     lockPageAuth,
     unlockPageAuth,
@@ -44,18 +43,18 @@ async function handleDiscordAuth(page) {
     // 1. 检查是否在 zai.is/auth 页面
     if (currentUrl.includes('zai.is/auth')) {
         lockPageAuth(page);
-        logger.info('适配器', '[登录器(zai_is)] 检测到登录页面，正在处理 Discord 登录...');
+        logger.info('适配器', '[登录器(zai)] 检测到登录页面，正在处理 Discord 登录...');
 
         try {
             // 等待页面加载完成，点击唯一的 button 标签
             await page.waitForSelector('button', { timeout: 30000 });
             await sleep(1000, 1500);
             await safeClick(page, 'button', { bias: 'button' });
-            logger.info('适配器', '[登录器(zai_is)] 已点击登录按钮，等待跳转到 Discord...');
+            logger.info('适配器', '[登录器(zai)] 已点击登录按钮，等待跳转到 Discord...');
 
             // 2. 等待跳转到 Discord OAuth2 授权页面
             await page.waitForURL(url => url.href.includes('discord.com/oauth2/authorize'), { timeout: 60000 });
-            logger.info('适配器', '[登录器(zai_is)] 已到达 Discord 授权页面');
+            logger.info('适配器', '[登录器(zai)] 已到达 Discord 授权页面');
             await sleep(2000, 3000);
 
             // 3. 使用鼠标滚轮滚动 main 元素，直到授权按钮可用
@@ -67,7 +66,7 @@ async function handleDiscordAuth(page) {
                 if (authorizeBtn) {
                     const isDisabled = await authorizeBtn.evaluate(el => el.disabled).catch(() => true);
                     if (!isDisabled) {
-                        logger.info('适配器', '[登录器(zai_is)] 授权按钮已可用，正在点击...');
+                        logger.info('适配器', '[登录器(zai)] 授权按钮已可用，正在点击...');
                         await sleep(500, 1000);
                         await safeClick(page, authorizeBtn, { bias: 'button' });
                         break;
@@ -87,7 +86,7 @@ async function handleDiscordAuth(page) {
             }
 
             // 4. 等待跳转回 zai.is (不包含 auth 和 discord)
-            logger.info('适配器', '[登录器(zai_is)] 等待跳转回目标页面...');
+            logger.info('适配器', '[登录器(zai)] 等待跳转回目标页面...');
             await page.waitForURL(url => {
                 const href = url.href;
                 return href.includes('zai.is') &&
@@ -95,12 +94,12 @@ async function handleDiscordAuth(page) {
                     !href.includes('discord.com');
             }, { timeout: 60000 });
 
-            logger.info('适配器', '[登录器(zai_is)] Discord 登录完成');
+            logger.info('适配器', '[登录器(zai)] Discord 登录完成');
             await sleep(2000, 3000);
             unlockPageAuth(page);
             return true;
         } catch (err) {
-            logger.warn('适配器', `[登录器(zai_is)] Discord 登录处理失败: ${err.message}`);
+            logger.warn('适配器', `[登录器(zai)] Discord 登录处理失败: ${err.message}`);
             unlockPageAuth(page);
         }
     }
@@ -109,15 +108,33 @@ async function handleDiscordAuth(page) {
     return false;
 }
 
+/**
+ * 从 content 中移除开头的 <details> 思考块
+ * @param {string} content - 原始内容
+ * @returns {string} 处理后的内容
+ */
+function extractTextContent(content) {
+    if (!content) return '';
+
+    // 匹配开头的 <details type="reasoning" ...>...</details> 块
+    // 使用非贪婪匹配和 dotAll 模式 (s flag)
+    const detailsPattern = /^<details\s+type="reasoning"[^>]*>[\s\S]*?<\/details>\s*/;
+
+    // 移除开头的 details 块，返回剩余内容
+    const result = content.replace(detailsPattern, '').trim();
+
+    return result;
+}
+
 
 /**
- * 生成图片
+ * 生成文本
  * @param {object} context - 浏览器上下文 { page, client, config }
  * @param {string} prompt - 提示词
  * @param {string[]} imgPaths - 参考图片路径数组
  * @param {string} modelId - 模型 ID
  * @param {object} meta - 日志元数据
- * @returns {Promise<{image?: string, error?: string}>} 生成结果
+ * @returns {Promise<{text?: string, error?: string}>} 生成结果
  */
 async function generate(context, prompt, imgPaths, modelId, meta = {}) {
     const { page, config } = context;
@@ -137,15 +154,26 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
         await waitForInput(page, INPUT_SELECTOR, { click: false });
         await sleep(1500, 2500);
 
-        // 2. 上传图片
+        // 2. 上传图片 (如果有多张图片，会一张一张上传，每次都是 v1/files POST 请求)
         if (imgPaths && imgPaths.length > 0) {
+            const expectedUploads = imgPaths.length;
+            let uploadedCount = 0;
+
             await pasteImages(page, INPUT_SELECTOR, imgPaths, {
                 uploadValidator: (response) => {
                     const url = response.url();
-                    return response.status() === 200 && url.includes('v1/files');
+                    if (response.status() === 200 && url.includes('v1/files')) {
+                        uploadedCount++;
+                        logger.info('适配器', `图片上传进度: ${uploadedCount}/${expectedUploads}`, meta);
+                        if (uploadedCount >= expectedUploads) {
+                            return true;
+                        }
+                    }
+                    return false;
                 }
             });
-            await sleep(500, 1000);
+
+            await sleep(1000, 2000);
         }
 
         // 3. 填写提示词
@@ -178,54 +206,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
 
         logger.info('适配器', `已选择模型: ${targetModel}`, meta);
 
-        // 5. 检查 GIF Generation 按钮状态，确保为 OFF
-        const gifBtn = page.getByRole('button', { name: /^GIF Generation/ });
-        const gifBtnExists = await gifBtn.count();
-        if (gifBtnExists > 0) {
-            const gifState = await gifBtn.evaluate(el => {
-                const generic = el.querySelector('[role="generic"]') || el;
-                return generic.textContent?.trim() || '';
-            });
-
-            if (!gifState.includes('OFF')) {
-                logger.debug('适配器', `GIF Generation 当前为 ${gifState}，正在切换为 OFF`, meta);
-                await safeClick(page, gifBtn, { bias: 'button' });
-                await sleep(300, 500);
-            }
-        }
-
-        // 6. 设置图片大小 (如果模型配置了 imageSize)
-        if (modelConfig?.imageSize) {
-            const targetSize = modelConfig.imageSize;  // 例如 "1K", "2K", "4K"
-            logger.debug('适配器', `正在设置图片大小: ${targetSize}`, meta);
-
-            const imageSizeBtn = page.getByRole('button', { name: /^Image Size/ });
-            const btnExists = await imageSizeBtn.count();
-
-            if (btnExists > 0) {
-                // 最多点击 4 次切换
-                for (let i = 0; i < 4; i++) {
-                    // 获取当前图片大小 (从按钮下的 generic 元素中的 text leaf 获取)
-                    const currentSize = await imageSizeBtn.evaluate(el => {
-                        const generic = el.querySelector('[role="generic"]') || el;
-                        return generic.textContent?.trim() || '';
-                    });
-
-                    if (currentSize.includes(targetSize)) {
-                        logger.info('适配器', `图片大小已设置为: ${targetSize}`, meta);
-                        break;
-                    }
-
-                    // 点击切换
-                    await safeClick(page, imageSizeBtn, { bias: 'button' });
-                    await sleep(300, 500);
-                }
-            } else {
-                logger.debug('适配器', '未找到 Image Size 按钮', meta);
-            }
-        }
-
-        // 7. 提交
+        // 5. 提交
         logger.debug('适配器', '点击发送...', meta);
         await submit(page, {
             btnSelector: 'button[type="submit"]',
@@ -235,7 +216,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
 
         logger.info('适配器', '等待生成结果中...', meta);
 
-        // 8. 等待 v1/chats/new 响应 (状态码 200 且响应体中有 id)
+        // 6. 等待 v1/chats/new 响应 (状态码 200 且响应体中有 id)
         let chatsNewResponse;
         try {
             chatsNewResponse = await waitApiResponse(page, {
@@ -269,8 +250,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
             return { error: '解析对话响应失败' };
         }
 
-
-        // 9. 等待 chat/completions 响应 (状态码 200 且 status: true)
+        // 7. 等待 chat/completions 响应 (状态码 200 且 status: true)
         let completionsResponse;
         try {
             completionsResponse = await waitApiResponse(page, {
@@ -304,7 +284,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
             return { error: '解析生成响应失败' };
         }
 
-        // 10. 等待 chat/completed 响应，从中提取图片链接
+        // 8. 等待 chat/completed 响应，从中提取文本内容
         logger.debug('适配器', '正在等待完成响应...', meta);
 
         let completedResponse;
@@ -350,24 +330,16 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
             return { error: '回复内容为空可能触发违规/限流' };
         }
 
-        // 从 content 中提取图片链接 (格式: ![...](https://zai.is/...))
-        const imageUrlMatch = content.match(/!\[.*?\]\((https:\/\/zai\.is\/[^)]+)\)/);
-        if (!imageUrlMatch || !imageUrlMatch[1]) {
-            logger.warn('适配器', '回复中未找到图片链接', meta);
-            return { error: '回复中未找到图片链接' };
+        // 提取文本内容 (移除开头的 <details> 思考块)
+        const textContent = extractTextContent(content);
+        if (!textContent) {
+            logger.warn('适配器', '提取文本内容为空', meta);
+            return { error: '提取文本内容为空' };
         }
 
-        const imageUrl = imageUrlMatch[1];
-        logger.info('适配器', `已提取图片链接: ${imageUrl}`, meta);
-
-        // 下载图片
-        const downloadResult = await useContextDownload(imageUrl, page);
-        if (downloadResult.error) {
-            return downloadResult;
-        }
-
-        logger.info('适配器', '已下载图片，任务完成', meta);
-        return { image: downloadResult.image };
+        logger.info('适配器', `已提取文本内容 (${textContent.length} 字符)`, meta);
+        logger.info('适配器', '文本生成完成，任务完成', meta);
+        return { text: textContent };
 
     } catch (err) {
         // 顶层错误处理
@@ -386,26 +358,39 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
  * 适配器 manifest
  */
 export const manifest = {
-    id: 'zai_is',
-    displayName: 'zAI (图片生成)',
-    description: '使用 zAI 平台生成图片，支持多种图片生成模型和分辨率选择。需要 Discord 账户登录授权。',
+    id: 'zai_is_text',
+    displayName: 'zAI (文本生成)',
+    description: '使用 zAI 平台生成文本，支持多种大语言模型。需要 Discord 账户登录授权。',
 
     // 入口 URL
     getTargetUrl(config, workerConfig) {
         return TARGET_URL;
     },
 
-    // 模型列表
+    // 模型列表 - 文本生成模型
     models: [
-        { id: 'gemini-3-pro-image-preview', codeName: 'Nano Banana Pro', imagePolicy: 'optional', imageSize: '1K' },
-        { id: 'gemini-3-pro-image-preview-2k', codeName: 'Nano Banana Pro', imagePolicy: 'optional', imageSize: '2K' },
-        { id: 'gemini-3-pro-image-preview-4k', codeName: 'Nano Banana Pro', imagePolicy: 'optional', imageSize: '4K' },
-        { id: 'gemini-2.5-flash-image', codeName: 'Nano Banana', imagePolicy: 'optional' }
+        { id: 'glm-4.6', codeName: 'GLM 4.6', imagePolicy: 'optional' },
+        { id: 'gemini-3-pro-preview', codeName: 'Gemini 3 Pro Preview', imagePolicy: 'optional' },
+        { id: 'gemini-2.5-pro', codeName: 'Gemini 2.5 Pro', imagePolicy: 'optional' },
+        { id: 'gemini-3-flash-preview', codeName: 'Gemini 3 Flash Preview', imagePolicy: 'optional' },
+        { id: 'claude-sonnet-4.5', codeName: 'Claude Sonnet 4.5', imagePolicy: 'optional' },
+        { id: 'claude-sonnet-4', codeName: 'Claude Sonnet 4', imagePolicy: 'optional' },
+        { id: 'claude-haiku-4.5', codeName: 'Claude Haiku 4.5', imagePolicy: 'optional' },
+        { id: 'gpt-5.1', codeName: 'GPT-5.1', imagePolicy: 'optional' },
+        { id: 'gpt-5', codeName: 'GPT-5', imagePolicy: 'optional' },
+        { id: 'gpt-4.1', codeName: 'GPT-4.1', imagePolicy: 'optional' },
+        { id: 'gpt-5.2', codeName: 'GPT-5.2 Chat', imagePolicy: 'optional' },
+        { id: 'o3-high', codeName: 'o3-high', imagePolicy: 'optional' },
+        { id: 'o3-mini', codeName: 'o3-mini', imagePolicy: 'optional' },
+        { id: 'o4-mini', codeName: 'o4-mini', imagePolicy: 'optional' },
+        { id: 'grok-4.1-fast', codeName: 'Grok 4.1 Fast', imagePolicy: 'optional' },
+        { id: 'grok-4', codeName: 'Grok 4', imagePolicy: 'optional' },
+        { id: 'kimi-k2-thinking', codeName: 'Kimi K2 Thinking', imagePolicy: 'optional' },
     ],
 
     // 导航处理器
     navigationHandlers: [handleDiscordAuth],
 
-    // 核心生图方法
+    // 核心文本生成方法
     generate
 };

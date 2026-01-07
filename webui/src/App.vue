@@ -108,9 +108,37 @@ const handleImageChange = async (info) => {
   }
 };
 
-// 解析 Markdown 图片
+// 将 base64 转换为 blob URL
+const base64ToBlob = (dataUri) => {
+  const arr = dataUri.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return URL.createObjectURL(new Blob([u8arr], { type: mime }));
+};
+
+// 解析内容中的 Markdown 图片和直接的视频 data URI
 const parseMarkdownImages = (content) => {
-  if (!content) return { text: '', images: [] };
+  if (!content) return { text: '', images: [], videos: [] };
+
+  // 检测是否是直接的 data:video/ 内容（非 markdown 格式）
+  if (content.trim().startsWith('data:video/')) {
+    try {
+      const blobUrl = base64ToBlob(content.trim());
+      return {
+        text: '',
+        images: [],
+        videos: [{ src: blobUrl, type: 'video/mp4' }]
+      };
+    } catch (e) {
+      console.error('视频转换失败', e);
+      return { text: content, images: [], videos: [] };
+    }
+  }
 
   const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
   const images = [];
@@ -127,10 +155,9 @@ const parseMarkdownImages = (content) => {
     // 添加图片
     images.push({
       alt: match[1] || '图片',
-      src: match[2]
+      src: match[2],
+      type: 'image'
     });
-
-    // 不添加占位符，直接跳过图片的 markdown 语法
 
     lastIndex = imageRegex.lastIndex;
   }
@@ -142,7 +169,8 @@ const parseMarkdownImages = (content) => {
 
   return {
     text: textParts.join('').trim(),
-    images
+    images,
+    videos: []
   };
 };
 
@@ -544,49 +572,59 @@ onMounted(async () => {
           </div>
 
           <!-- 测试结果 -->
-          <!-- 流式模式：实时显示内容 -->
-          <div v-if="chatStreamMode && apiTestResults.chat.status === 'loading'"
-            style="background: #fafafa; padding: 12px; border-radius: 4px; font-size: 12px; max-height: 400px; overflow-y: auto;">
-            <div style="color: #1890ff; margin-bottom: 8px;">
-              <LoadingOutlined /> 正在接收流式响应...
+          <!-- 加载中或成功：统一显示内容 -->
+          <div v-if="apiTestResults.chat.status === 'loading' || apiTestResults.chat.status === 'success'">
+            <!-- 状态标签 -->
+            <div style="margin-bottom: 8px;">
+              <a-tag v-if="apiTestResults.chat.status === 'loading'" color="processing">
+                <LoadingOutlined /> {{ chatStreamMode ? '正在接收流式响应...' : '请求中，可能需要较长时间...' }}
+              </a-tag>
+              <a-tag v-else color="success">
+                <CheckCircleOutlined /> 成功
+              </a-tag>
             </div>
-            <!-- 文本内容 -->
-            <pre v-if="parseMarkdownImages(chatStreamContent).text"
-              style="white-space: pre-wrap; word-break: break-all; margin: 0 0 8px 0; min-height: 50px;">{{
-                parseMarkdownImages(chatStreamContent).text || '等待内容...' }}</pre>
-            <!-- 图片展示 -->
-            <div v-if="parseMarkdownImages(chatStreamContent).images.length > 0"
-              style="display: flex; flex-direction: column; gap: 8px;">
-              <div v-for="(img, index) in parseMarkdownImages(chatStreamContent).images" :key="index"
-                style="border: 1px solid #d9d9d9; border-radius: 4px; padding: 4px; background: white;">
-                <div style="font-size: 11px; color: #8c8c8c; margin-bottom: 4px;">{{ img.alt }}</div>
-                <img :src="img.src" :alt="img.alt"
-                  style="max-width: 100%; height: auto; display: block; border-radius: 2px;" />
-              </div>
-            </div>
-          </div>
-          <div v-else-if="apiTestResults.chat.status === 'success'">
-            <a-tag color="success">
-              <CheckCircleOutlined /> 成功
-            </a-tag>
-            <div
-              style="margin-top: 8px; font-size: 12px; max-height: 400px; overflow-y: auto; background: #fafafa; padding: 8px; border-radius: 4px;">
+
+            <!-- 内容显示容器（流式用 chatStreamContent，成功后用 data.content） -->
+            <div v-if="chatStreamMode ? chatStreamContent : apiTestResults.chat.data?.content"
+              style="font-size: 12px; max-height: 400px; overflow-y: auto; background: #fafafa; padding: 8px; border-radius: 4px;">
               <!-- 文本内容 -->
-              <pre v-if="parseMarkdownImages(apiTestResults.chat.data?.content).text"
+              <pre
+                v-if="parseMarkdownImages(chatStreamMode ? chatStreamContent : apiTestResults.chat.data?.content).text"
                 style="white-space: pre-wrap; word-break: break-all; margin: 0 0 8px 0;">{{
-                  parseMarkdownImages(apiTestResults.chat.data?.content).text }}</pre>
+                  parseMarkdownImages(chatStreamMode ? chatStreamContent : apiTestResults.chat.data?.content).text }}</pre>
+
               <!-- 图片展示 -->
-              <div v-if="parseMarkdownImages(apiTestResults.chat.data?.content).images.length > 0"
+              <div
+                v-if="parseMarkdownImages(chatStreamMode ? chatStreamContent : apiTestResults.chat.data?.content).images.length > 0"
                 style="display: flex; flex-direction: column; gap: 8px;">
-                <div v-for="(img, index) in parseMarkdownImages(apiTestResults.chat.data?.content).images" :key="index"
-                  style="border: 1px solid #d9d9d9; border-radius: 4px; padding: 4px; background: white;">
+                <div
+                  v-for="(img, index) in parseMarkdownImages(chatStreamMode ? chatStreamContent : apiTestResults.chat.data?.content).images"
+                  :key="index" style="border: 1px solid #d9d9d9; border-radius: 4px; padding: 4px; background: white;">
                   <div style="font-size: 11px; color: #8c8c8c; margin-bottom: 4px;">{{ img.alt }}</div>
                   <img :src="img.src" :alt="img.alt"
                     style="max-width: 100%; height: auto; display: block; border-radius: 2px;" />
                 </div>
               </div>
+
+              <!-- 视频展示 -->
+              <div
+                v-if="parseMarkdownImages(chatStreamMode ? chatStreamContent : apiTestResults.chat.data?.content).videos.length > 0"
+                style="display: flex; flex-direction: column; gap: 8px;">
+                <div
+                  v-for="(video, index) in parseMarkdownImages(chatStreamMode ? chatStreamContent : apiTestResults.chat.data?.content).videos"
+                  :key="'video-' + index"
+                  style="border: 1px solid #d9d9d9; border-radius: 4px; padding: 4px; background: white;">
+                  <div style="font-size: 11px; color: #8c8c8c; margin-bottom: 4px;">生成的视频</div>
+                  <video :src="video.src" controls
+                    style="max-width: 100%; height: auto; display: block; border-radius: 2px;">
+                    您的浏览器不支持视频播放。
+                  </video>
+                </div>
+              </div>
             </div>
           </div>
+
+          <!-- 错误状态 -->
           <div v-else-if="apiTestResults.chat.status === 'error'">
             <a-tag color="error">
               <CloseCircleOutlined /> 失败
@@ -594,10 +632,6 @@ onMounted(async () => {
             <div style="margin-top: 8px; font-size: 12px; color: #ff4d4f;">
               {{ apiTestResults.chat.error }}
             </div>
-          </div>
-          <div v-else-if="apiTestResults.chat.status === 'loading' && !chatStreamMode"
-            style="color: #1890ff; font-size: 12px;">
-            <LoadingOutlined /> 请求中，可能需要较长时间...
           </div>
         </a-card>
       </a-space>

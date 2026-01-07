@@ -1,5 +1,5 @@
 /**
- * @fileoverview Gemini Business 适配器
+ * @fileoverview Gemini Business 图片、视频生成适配器
  */
 
 import {
@@ -215,6 +215,7 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
                 urlMatch: 'global/widgetStreamAssist',
                 method: 'POST',
                 timeout: 120000,
+                errorText: ['modelArmorViolation'],
                 meta
             });
         } catch (e) {
@@ -307,7 +308,8 @@ async function generate(context, prompt, imgPaths, modelId, meta = {}) {
  */
 export const manifest = {
     id: 'gemini_biz_text',
-    displayName: 'Gemini Business (Text)',
+    displayName: 'Gemini Business (文本生成)',
+    description: '使用 Gemini Business 企业版生成文本，支持 Grounding 搜索模式。需要提供入口 URL 并已登录企业账户 (每个谷歌账户首次可以在官网点击免费试用获取30天使用资格)，与 gemini_biz 共享配置。',
 
     // 配置表单定义（与 gemini_biz 共享配置）
     configSchema: [

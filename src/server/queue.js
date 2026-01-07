@@ -131,11 +131,16 @@ export function createQueueManager(queueConfig, callbacks) {
             // 生成成功
             let finalContent = '';
             if (result.image) {
-                finalContent = `![generated](${result.image})`;
-                logger.info('服务器', '图片已准备就绪 (Base64)', { id });
+                // 只有图片格式才使用 markdown，视频等其他格式直接返回 data URI
+                if (result.image.startsWith('data:image/')) {
+                    finalContent = `![generated](${result.image})`;
+                } else {
+                    finalContent = result.image;
+                }
             } else {
                 finalContent = result.text || '生成失败';
             }
+            logger.info('服务器', '结果已准备就绪', { id });
 
             // 发送成功响应
             logger.info('服务器', '准备发送响应...', { id, isStreaming, contentLength: finalContent.length });
